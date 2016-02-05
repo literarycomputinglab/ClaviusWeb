@@ -1,0 +1,3 @@
+http://wafi.iit.cnr.it:33065/manager
+user: admin
+pass: omega12

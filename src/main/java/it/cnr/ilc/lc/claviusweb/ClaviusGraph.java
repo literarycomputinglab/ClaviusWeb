@@ -1,11 +1,10 @@
 package it.cnr.ilc.lc.claviusweb;
 
 import com.google.gson.Gson;
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
@@ -14,7 +13,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
-import org.neo4j.graphdb.NotFoundException;
 import org.neo4j.graphdb.Transaction;
 import org.neo4j.rest.graphdb.RestGraphDatabase;
 
@@ -45,72 +43,100 @@ public class ClaviusGraph extends HttpServlet {
 
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+        Gson gson = new Gson();
         String command = request.getPathInfo().substring(1);
+        String json = readPost(request);
         if ("create".equals(command)) {
-            System.out.println("create name: " + request.getParameter("name") + " content: " + request.getParameter("content"));
-            response.getWriter().append(createNode(request.getParameter("name"), request.getParameter("content")));
+            System.out.println("create " + json);
+            response.getWriter().append(gson.toJson(createNode(gson.fromJson(json, Document.class))));
         } else if ("update".equals(command)) {
-            System.out.println("update id: " + request.getParameter("id") + " name: " + request.getParameter("name") + " content: " + request.getParameter("content"));
-            response.getWriter().append(updateNode(Long.valueOf(request.getParameter("id")), request.getParameter("name"), request.getParameter("content")));
+            System.out.println("update " + json);
+            response.getWriter().append(gson.toJson(updateNode(gson.fromJson(json, Document.class))));
         } else if ("load".equals(command)) {
-            System.out.println("load id: " + request.getParameter("id"));
-            response.getWriter().append(loadNode(Long.valueOf(request.getParameter("id"))));
+            System.out.println("load " + json);
+            response.getWriter().append(gson.toJson(loadNode(gson.fromJson(json, Document.class))));
         } else if ("list".equals(command)) {
             System.out.println("list");
-            response.getWriter().append(listNodes());
+            response.getWriter().append(gson.toJson(listNodes()));
+        } else {
+            throw new UnsupportedOperationException("Unvalid path URI for command " + command + "::" + json);
         }
     }
 
-    private String createNode(String name, String content) {
+    private String readPost(HttpServletRequest request) throws IOException {
+        try (BufferedReader reader = new BufferedReader(request.getReader())) {
+            String line;
+            StringBuilder builder = new StringBuilder();
+            while ((line = reader.readLine()) != null) {
+                builder.append(line);
+            }
+            return builder.toString();
+        }
+    }
+
+    private Document createNode(Document document) {
         synchronized (db) {
             try (Transaction tx = db.beginTx()) {
                 Node node = db.createNode(() -> "Clavius");
-                node.setProperty("name", name);
-                node.setProperty("content", content);
+                node.setProperty("name", document.name);
+                node.setProperty("code", document.code);
+                node.setProperty("graph", document.graph);
                 tx.success();
-                return "" + node.getId();
+                document.id = node.getId();
+                return document;
             }
         }
     }
 
-    private String updateNode(Long id, String name, String content) {
+    private Document updateNode(Document document) {
         synchronized (db) {
             try (Transaction tx = db.beginTx()) {
-                Node node = db.getNodeById(id);
-                node.setProperty("name", name);
-                node.setProperty("content", content);
+                Node node = db.getNodeById(document.id);
+                node.setProperty("name", document.name);
+                node.setProperty("code", document.code);
+                node.setProperty("graph", document.graph);
                 tx.success();
-                return Boolean.TRUE.toString();
-            } catch (NotFoundException ne) {
-                return Boolean.FALSE.toString();
+                return document;
             }
         }
     }
 
-    private String loadNode(Long id) {
+    private Document loadNode(Document document) {
         synchronized (db) {
             try (Transaction tx = db.beginTx()) {
-                Node node = db.getNodeById(id);
-                return (String) node.getProperty("content");
-            } catch (NotFoundException ne) {
-                return "";
+                Node node = db.getNodeById(document.id);
+                document.name = (String) node.getProperty("name", "");
+                document.code = (String) node.getProperty("code", "");
+                document.graph = (String) node.getProperty("graph", "");
+                return document;
             }
         }
     }
 
-    private String listNodes() {
+    private List<Document> listNodes() {
         synchronized (db) {
             try (Transaction tx = db.beginTx()) {
-                List<Map<String, Object>> list = new ArrayList<>();
-                Map<String, Object> map;
+                List<Document> documents = new ArrayList<>();
                 for (Node node : db.findNodesByLabelAndProperty(() -> "Clavius", null, null)) {
-                    map = new HashMap<>();
-                    map.put("id", node.getId());
-                    map.put("name", node.getProperty("name"));
-                    list.add(map);
+                    Document document = new Document();
+                    document.id = node.getId();
+                    document.name = (String) node.getProperty("name", "");
+                    documents.add(document);
                 }
-                return new Gson().toJson(list);
+                return documents;
             }
         }
     }
+
+    private class Document {
+
+        private Long id;
+        private String name;
+        private String code;
+        private String graph;
+
+    }
+
 }
