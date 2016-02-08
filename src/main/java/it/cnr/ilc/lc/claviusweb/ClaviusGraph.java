@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.List;
 import javax.servlet.ServletConfig;
@@ -96,7 +97,7 @@ public class ClaviusGraph extends HttpServlet {
                 Node node = db.getNodeById(document.id);
                 node.setProperty("name", document.name);
                 node.setProperty("code", document.code);
-                node.setProperty("graph", new Gson().toJson(document.graph));
+                node.setProperty("graph", new Gson().toJson(document.graph)); // la proprietà graph non viene serializzata bene!
                 tx.success();
                 return document;
             }
@@ -109,7 +110,8 @@ public class ClaviusGraph extends HttpServlet {
                 Node node = db.getNodeById(document.id);
                 document.name = (String) node.getProperty("name", "");
                 document.code = (String) node.getProperty("code", "");
-                document.graph = new Gson().toJson(node.getProperty("graph", ""));
+                document.graph = //new Gson().toJson((String) node.getProperty("graph", ""));
+                new Gson().fromJson(new StringReader((String)node.getProperty("graph", "")), Object.class); // in questo modo la proprietà graph viene richiamata bene e interpretata con un oggetto json
                 return document;
             }
         }
