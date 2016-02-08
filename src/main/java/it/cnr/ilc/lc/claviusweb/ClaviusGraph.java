@@ -1,6 +1,7 @@
 package it.cnr.ilc.lc.claviusweb;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonElement;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -67,14 +68,21 @@ public class ClaviusGraph extends HttpServlet {
         }
     }
 
-   
-    private Document createNode(Document document) {
+   /**
+    * the POST body has to be formatted as follows
+    * {"name":"nickname","code":"the document encoded", "graph":{"nodes":[],"links:[]"}}
+    * 
+    **/
+    
+    // criticità: il graph è una stringa, se arriva un JSON OBJECT da errore
+    private Document createNode (Document document) {
         synchronized (db) {
             try (Transaction tx = db.beginTx()) {
                 Node node = db.createNode(() -> "Clavius");
                 node.setProperty("name", document.name);
                 node.setProperty("code", document.code);
-                node.setProperty("graph", document.graph);
+                
+                node.setProperty("graph", new Gson().toJson(document.graph)); // la proprietà graph non viene serializzata bene!
                 tx.success();
                 document.id = node.getId();
                 return document;
@@ -88,7 +96,7 @@ public class ClaviusGraph extends HttpServlet {
                 Node node = db.getNodeById(document.id);
                 node.setProperty("name", document.name);
                 node.setProperty("code", document.code);
-                node.setProperty("graph", document.graph);
+                node.setProperty("graph", new Gson().toJson(document.graph));
                 tx.success();
                 return document;
             }
@@ -101,7 +109,7 @@ public class ClaviusGraph extends HttpServlet {
                 Node node = db.getNodeById(document.id);
                 document.name = (String) node.getProperty("name", "");
                 document.code = (String) node.getProperty("code", "");
-                document.graph = (String) node.getProperty("graph", "");
+                document.graph = new Gson().toJson(node.getProperty("graph", ""));
                 return document;
             }
         }
@@ -139,7 +147,7 @@ public class ClaviusGraph extends HttpServlet {
         private Long id;
         private String name;
         private String code;
-        private String graph;
+        private Object graph; // attenzione cambiato il graph da String a Object
 
     }
 
