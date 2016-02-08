@@ -15,7 +15,22 @@
             <param-value>omega</param-value>
         </init-param>
     </servlet>
-    <session-config>
+     <servlet>
+        <servlet-name>ClaviusDeepGraph</servlet-name>
+        <init-param>
+            <param-name>url</param-name>
+            <param-value>http://localhost:7474/db/data</param-value>
+        </init-param>
+        <init-param>
+            <param-name>username</param-name>
+            <param-value>neo4j</param-value>
+        </init-param>
+        <init-param>
+            <param-name>password</param-name>
+            <param-value>omega</param-value>
+        </init-param>
+    </servlet>
+  <session-config>
         <session-timeout>
             30
         </session-timeout>

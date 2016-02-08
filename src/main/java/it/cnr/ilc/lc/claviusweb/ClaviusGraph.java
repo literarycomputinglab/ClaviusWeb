@@ -45,6 +45,8 @@ public class ClaviusGraph extends HttpServlet {
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
+        response.setHeader("Access-Control-Allow-Origin", "*");
+        
         Gson gson = new Gson();
         String command = request.getPathInfo().substring(1);
         String json = readPost(request);
