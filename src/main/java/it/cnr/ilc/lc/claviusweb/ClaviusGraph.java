@@ -65,17 +65,7 @@ public class ClaviusGraph extends HttpServlet {
         }
     }
 
-    private String readPost(HttpServletRequest request) throws IOException {
-        try (BufferedReader reader = new BufferedReader(request.getReader())) {
-            String line;
-            StringBuilder builder = new StringBuilder();
-            while ((line = reader.readLine()) != null) {
-                builder.append(line);
-            }
-            return builder.toString();
-        }
-    }
-
+   
     private Document createNode(Document document) {
         synchronized (db) {
             try (Transaction tx = db.beginTx()) {
@@ -129,6 +119,18 @@ public class ClaviusGraph extends HttpServlet {
             }
         }
     }
+    
+     private String readPost(HttpServletRequest request) throws IOException {
+        try (BufferedReader reader = new BufferedReader(request.getReader())) {
+            String line;
+            StringBuilder builder = new StringBuilder();
+            while ((line = reader.readLine()) != null) {
+                builder.append(line);
+            }
+            return builder.toString();
+        }
+    }
+              
 
     private class Document {
 
