@@ -11,6 +11,8 @@ import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Transaction;
@@ -24,10 +26,12 @@ import org.neo4j.rest.graphdb.RestGraphDatabase;
 public class ClaviusGraph extends HttpServlet {
 
     private static GraphDatabaseService db;
+    private static Logger log = LogManager.getLogger(ClaviusGraph.class);
 
     @Override
     public void init(ServletConfig config) throws ServletException {
         if (db == null) {
+            log.info("Neo4j init()");
             String url = config.getInitParameter("url");
             String username = config.getInitParameter("username");
             String password = config.getInitParameter("password");
@@ -38,6 +42,8 @@ public class ClaviusGraph extends HttpServlet {
                     db.shutdown();
                 }
             });
+            log.info("Neo4j initialized");
+
         }
     }
 
@@ -46,23 +52,24 @@ public class ClaviusGraph extends HttpServlet {
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
         response.setHeader("Access-Control-Allow-Origin", "*");
-        
+
         Gson gson = new Gson();
         String command = request.getPathInfo().substring(1);
         String json = readPost(request);
         if ("create".equals(command)) {
-            System.out.println("create " + json);
+            log.info("create " + json);
             response.getWriter().append(gson.toJson(createNode(gson.fromJson(json, Document.class))));
         } else if ("update".equals(command)) {
-            System.out.println("update " + json);
+            log.info("update " + json);
             response.getWriter().append(gson.toJson(updateNode(gson.fromJson(json, Document.class))));
         } else if ("load".equals(command)) {
-            System.out.println("load " + json);
+            log.info("load " + json);
             response.getWriter().append(gson.toJson(loadNode(gson.fromJson(json, Document.class))));
         } else if ("list".equals(command)) {
-            System.out.println("list");
+            log.info("list");
             response.getWriter().append(gson.toJson(listNodes()));
         } else {
+            log.error("Unvalid path URI for command " + command + "::" + json);
             throw new UnsupportedOperationException("Unvalid path URI for command " + command + "::" + json);
         }
     }
