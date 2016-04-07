@@ -30,7 +30,14 @@
             <param-value>omega</param-value>
         </init-param>
     </servlet>
-  <session-config>
+   <servlet>
+        <servlet-name>ClaviusSearch</servlet-name>
+        <init-param>
+            <param-name>puname</param-name>
+            <param-value>clavius</param-value>
+        </init-param>
+   </servlet>
+   <session-config>
         <session-timeout>
             30
         </session-timeout>
