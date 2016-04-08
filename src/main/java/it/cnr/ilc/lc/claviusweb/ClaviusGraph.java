@@ -190,7 +190,7 @@ public class ClaviusGraph extends HttpServlet {
             }
         }
     }
-
+    
     private void updateLuceneIndex(TEADocument teadoc) {
 
         entityManager.getTransaction().begin();
@@ -257,7 +257,7 @@ public class ClaviusGraph extends HttpServlet {
         private Long id;
         private String name;
         private String code;
-        private String graph;
+        private Object graph; // attenzione cambiato il graph da String a Object
 
     }
 
