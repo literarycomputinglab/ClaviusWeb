@@ -141,7 +141,10 @@ public class ClaviusGraph extends HttpServlet {
     }
 
     private TEADocument updateNode(TEADocument document) {
+        long endTime;
+        long midTime;
         synchronized (db) {
+            long startTime = System.currentTimeMillis();
             try (Transaction tx = db.beginTx()) {
                 Node node = db.getNodeById(document.id);
                 node.setProperty("name", document.name);
@@ -149,14 +152,18 @@ public class ClaviusGraph extends HttpServlet {
                 node.setProperty("graph", document.graph);
                 node.setProperty("idLetter", document.idLetter);
 
-                tx.success();
+                midTime = System.currentTimeMillis();
+                log.info("After neo4j load and set  " + (midTime - startTime) + " ms");
 
                 //salvataggio delle annotazioni
                 updateLuceneIndex(document);
-
-                return document;
+                endTime = System.currentTimeMillis();
+                log.info("Insert in index " + (endTime - midTime) + " ms");
+                tx.success();
             }
+            return document;
         }
+
     }
 
     private TEADocument loadNode(TEADocument document) {
@@ -192,43 +199,55 @@ public class ClaviusGraph extends HttpServlet {
 
     private void updateLuceneIndex(TEADocument teadoc) {
 
+        long startTime = System.currentTimeMillis();
+
         EntityManager entityManager = PersistenceListener.getEntityManager();
+        synchronized (entityManager) {
+            entityManager.getTransaction().begin();
 
-        entityManager.getTransaction().begin();
+            String plainText = teadoc.text;
+            String idLetter = teadoc.idLetter;
+            List<TEADocument.Triple> triples = teadoc.triples;
+            long time1 = System.currentTimeMillis();
 
-        String plainText = teadoc.text;
-        String idLetter = teadoc.idLetter;
-        List<TEADocument.Triple> triples = teadoc.triples;
+            Query query = entityManager.createNativeQuery("DELETE FROM Annotation WHERE idNeo4j = " + teadoc.id);
+            int deleted = query.executeUpdate();
+            long time2 = System.currentTimeMillis();
+            log.info("Delete " + deleted + " Annotation(s) in " + (time2 - time1) + " ms");
+            int count = 0;
+            if (null != triples) {
 
-        Query query = entityManager.createNativeQuery("DELETE FROM Annotation WHERE idNeo4j = " + teadoc.id);
-        log.info("deleted " + query.executeUpdate() + " row(s)");
-
-        if (null != triples) {
-
-            for (TEADocument.Triple triple : triples) {
-                Annotation a = new Annotation();
-                a.setLeftContext(plainText.substring(triple.start > ctxLen ? triple.start - ctxLen : 0, triple.start));
-                a.setRightContext(plainText.substring(triple.end, triple.end + ctxLen < plainText.length() ? triple.end + ctxLen : plainText.length()));
-                a.setIdLetter(Long.valueOf(idLetter));
-                a.setConcept(conceptsMap.getProperty(triple.object.substring(triple.object.lastIndexOf("/") + 1))); //@FIX triple.object sara' la chiave di accesso alla mappa dei concetti
-                a.setType(triple.object.substring(triple.object.lastIndexOf("/") + 1));
-                a.setResourceObject(triple.object);
-                a.setIdNeo4j(teadoc.id);
-                a.setMatched(plainText.substring(triple.start, triple.end));
-                entityManager.persist(a);
-                log.info("createEntity: " + a);
+                for (TEADocument.Triple triple : triples) {
+                    Annotation a = new Annotation();
+                    a.setLeftContext(plainText.substring(triple.start > ctxLen ? triple.start - ctxLen : 0, triple.start));
+                    a.setRightContext(plainText.substring(triple.end, triple.end + ctxLen < plainText.length() ? triple.end + ctxLen : plainText.length()));
+                    a.setIdLetter(Long.valueOf(idLetter));
+                    a.setConcept(conceptsMap.getProperty(triple.object.substring(triple.object.lastIndexOf("/") + 1))); //@FIX triple.object sara' la chiave di accesso alla mappa dei concetti
+                    a.setType(triple.object.substring(triple.object.lastIndexOf("/") + 1));
+                    a.setResourceObject(triple.object);
+                    a.setIdNeo4j(teadoc.id);
+                    a.setMatched(plainText.substring(triple.start, triple.end));
+                    entityManager.persist(a);
+                    log.info("createEntity: " + a);
+                    count++;
+                }
+            } else {
+                log.info("No triples in json request");
             }
-        } else {
-            log.info("No triples in json request");
-        }
+            long time3 = System.currentTimeMillis();
+            log.info("Created " + count + " Annotation(s) in " + (time3 - time2) + " ms");
 
-        try {
+            /*try {
             fullTextEntityManager.createIndexer().startAndWait();
         } catch (InterruptedException ex) {
             log.error(ex.getMessage());
+        }*/
+            //fullTextEntityManager.flushToIndexes();
+            entityManager.getTransaction().commit();
+            long time4 = System.currentTimeMillis();
+            log.info("Lucene index commit in " + (time4 - time3) + " ms");
+
         }
-        fullTextEntityManager.flushToIndexes();
-        entityManager.getTransaction().commit();
     }
 
     private void readProperies() {
