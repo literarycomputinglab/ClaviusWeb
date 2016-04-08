@@ -7,14 +7,13 @@ package it.cnr.ilc.lc.claviusweb;
 
 import com.google.gson.Gson;
 import it.cnr.ilc.lc.claviusweb.entity.Annotation;
+import it.cnr.ilc.lc.claviusweb.listener.PersistenceListener;
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.util.List;
-import java.util.logging.Level;
 import javax.persistence.EntityManager;
 import javax.persistence.EntityManagerFactory;
-import javax.persistence.Persistence;
+import javax.persistence.PersistenceUnit;
 import javax.persistence.RollbackException;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
@@ -37,15 +36,12 @@ import org.hibernate.search.jpa.FullTextQuery;
 public class ClaviusSearch extends HttpServlet {
 
     private static Logger log = LogManager.getLogger(ClaviusSearch.class);
-    EntityManagerFactory entityManagerFactory;
-    EntityManager entityManager;
-    FullTextEntityManager fullTextEntityManager;
+    private FullTextEntityManager fullTextEntityManager = null;
 
     @Override
     public void init(ServletConfig config) throws ServletException {
         log.info("init() puname: " + config.getInitParameter("puname"));
-        entityManagerFactory = Persistence.createEntityManagerFactory(config.getInitParameter("puname"));
-        entityManager = entityManagerFactory.createEntityManager();
+        EntityManager entityManager = PersistenceListener.getEntityManager();
 
         if (fullTextEntityManager == null) {
             log.info("Hibernate search init()");
@@ -66,7 +62,6 @@ public class ClaviusSearch extends HttpServlet {
                 public void run() {
                     log.info("closing Entity Manager");
                     fullTextEntityManager.close();
-                    entityManagerFactory.close();
                     log.info("closed Entity Manager");
 
                 }
@@ -125,8 +120,10 @@ public class ClaviusSearch extends HttpServlet {
     private List<Annotation> searchQueryParse(String query) {
 
         List result = null;
+        EntityManager entityManager = PersistenceListener.getEntityManager();
 
         try {
+
             entityManager.getTransaction().begin();
 
             log.info("searchQueryParse(" + query + ")");

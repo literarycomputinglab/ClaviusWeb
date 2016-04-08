@@ -16,7 +16,7 @@ public class TEADocument {
     public Long id;
     public String name;
     public String code;
-    public String graph;
+    public Object graph;
     public String text;
     public String idLetter;
     public List<Triple> triples;

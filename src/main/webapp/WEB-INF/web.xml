@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <web-app version="3.1" xmlns="http://xmlns.jcp.org/xml/ns/javaee" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://xmlns.jcp.org/xml/ns/javaee http://xmlns.jcp.org/xml/ns/javaee/web-app_3_1.xsd">
+    <!-- listener>
+        <description>ServletContextListener</description>
+        <listener-class>it.cnr.ilc.lc.claviusweb.listener.PersistenceListener</listener-class>
+    </listener-->
     <servlet>
         <servlet-name>ClaviusGraph</servlet-name>
         <init-param>
@@ -15,7 +19,7 @@
             <param-value>omega</param-value>
         </init-param>
     </servlet>
-     <servlet>
+    <servlet>
         <servlet-name>ClaviusDeepGraph</servlet-name>
         <init-param>
             <param-name>url</param-name>
@@ -30,14 +34,14 @@
             <param-value>omega</param-value>
         </init-param>
     </servlet>
-   <servlet>
+    <servlet>
         <servlet-name>ClaviusSearch</servlet-name>
         <init-param>
             <param-name>puname</param-name>
             <param-value>clavius</param-value>
         </init-param>
-   </servlet>
-   <session-config>
+    </servlet>
+    <session-config>
         <session-timeout>
             30
         </session-timeout>

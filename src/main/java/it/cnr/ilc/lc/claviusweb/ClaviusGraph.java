@@ -3,6 +3,7 @@ package it.cnr.ilc.lc.claviusweb;
 import com.google.gson.Gson;
 import it.cnr.ilc.lc.claviusweb.entity.Annotation;
 import it.cnr.ilc.lc.claviusweb.entity.TEADocument;
+import it.cnr.ilc.lc.claviusweb.listener.PersistenceListener;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -12,6 +13,8 @@ import java.util.Properties;
 import javax.persistence.EntityManager;
 import javax.persistence.EntityManagerFactory;
 import javax.persistence.Persistence;
+import javax.persistence.PersistenceContext;
+import javax.persistence.PersistenceUnit;
 import javax.persistence.Query;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
@@ -37,9 +40,7 @@ public class ClaviusGraph extends HttpServlet {
     private static GraphDatabaseService db;
     private static Logger log = LogManager.getLogger(ClaviusGraph.class);
 
-    EntityManagerFactory entityManagerFactory;
-    EntityManager entityManager;
-    FullTextEntityManager fullTextEntityManager;
+    private FullTextEntityManager fullTextEntityManager = null;
     private static final int ctxLen = 30;
     private static Properties conceptsMap;
 
@@ -58,8 +59,7 @@ public class ClaviusGraph extends HttpServlet {
             log.info("Neo4j initialized");
         }
 
-        entityManagerFactory = Persistence.createEntityManagerFactory(config.getInitParameter("puname"));
-        entityManager = entityManagerFactory.createEntityManager();
+        EntityManager entityManager = PersistenceListener.getEntityManager();
 
         if (fullTextEntityManager == null) {
             log.info("Hibernate search init()");
@@ -81,7 +81,6 @@ public class ClaviusGraph extends HttpServlet {
                 db.shutdown();
                 log.info("closing Entity Manager");
                 fullTextEntityManager.close();
-                entityManagerFactory.close();
                 log.info("closed Entity Manager");
 
             }
@@ -190,8 +189,10 @@ public class ClaviusGraph extends HttpServlet {
             }
         }
     }
-    
+
     private void updateLuceneIndex(TEADocument teadoc) {
+
+        EntityManager entityManager = PersistenceListener.getEntityManager();
 
         entityManager.getTransaction().begin();
 
@@ -250,15 +251,6 @@ public class ClaviusGraph extends HttpServlet {
                 }
             }
         }
-    }
-
-    private class Document {
-
-        private Long id;
-        private String name;
-        private String code;
-        private Object graph; // attenzione cambiato il graph da String a Object
-
     }
 
 }
