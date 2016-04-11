@@ -12,8 +12,6 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.util.List;
 import javax.persistence.EntityManager;
-import javax.persistence.EntityManagerFactory;
-import javax.persistence.PersistenceUnit;
 import javax.persistence.RollbackException;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
@@ -41,7 +39,15 @@ public class ClaviusSearch extends HttpServlet {
     @Override
     public void init(ServletConfig config) throws ServletException {
         log.info("init() puname: " + config.getInitParameter("puname"));
-        EntityManager entityManager = PersistenceListener.getEntityManager();
+        EntityManager entityManager = null;
+
+        try {
+            entityManager = PersistenceListener.getEntityManager();
+
+        } catch (Exception e) {
+            log.error(e.getMessage());
+            return;
+        }
 
         if (fullTextEntityManager == null) {
             log.info("Hibernate search init()");
@@ -60,11 +66,19 @@ public class ClaviusSearch extends HttpServlet {
             Runtime.getRuntime().addShutdownHook(new Thread() {
                 @Override
                 public void run() {
-                    log.info("closing Entity Manager");
-                    fullTextEntityManager.close();
-                    log.info("closed Entity Manager");
+                    try {
+                        log.info("closing Full Text Entity Manager");
+                        if (null != fullTextEntityManager) {
 
-                }
+                            if (fullTextEntityManager.isOpen()) {
+                                fullTextEntityManager.close();
+                                log.info("closed Full Text Entity Manager");
+                          }
+                        }
+                    } catch (IllegalStateException e) {
+                        log.warn("Closing fullTextEntityManager: " + e.getMessage());
+                    }
+               }
             });
             log.info("Hibernate search initialized");
 
@@ -120,7 +134,15 @@ public class ClaviusSearch extends HttpServlet {
     private List<Annotation> searchQueryParse(String query) {
 
         List result = null;
-        EntityManager entityManager = PersistenceListener.getEntityManager();
+        EntityManager entityManager = null;
+
+        try {
+            entityManager = PersistenceListener.getEntityManager();
+
+        } catch (Exception e) {
+            log.error(e.getMessage());
+            return null;
+        }
 
         try {
 

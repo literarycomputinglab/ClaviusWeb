@@ -11,10 +11,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import javax.persistence.EntityManager;
-import javax.persistence.EntityManagerFactory;
-import javax.persistence.Persistence;
-import javax.persistence.PersistenceContext;
-import javax.persistence.PersistenceUnit;
 import javax.persistence.Query;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
@@ -47,6 +43,7 @@ public class ClaviusGraph extends HttpServlet {
     @Override
     public void init(ServletConfig config) throws ServletException {
 
+        EntityManager entityManager = null;
         readProperies();
 
         if (db == null) {
@@ -59,7 +56,12 @@ public class ClaviusGraph extends HttpServlet {
             log.info("Neo4j initialized");
         }
 
-        EntityManager entityManager = PersistenceListener.getEntityManager();
+        try {
+            entityManager = PersistenceListener.getEntityManager();
+
+        } catch (Exception e) {
+            log.error(e.getMessage());
+        }
 
         if (fullTextEntityManager == null) {
             log.info("Hibernate search init()");
@@ -75,13 +77,29 @@ public class ClaviusGraph extends HttpServlet {
                 log.error("Error creating lucene indexes: " + ex.getMessage());
             }
         }
+
         Runtime.getRuntime().addShutdownHook(new Thread() {
             @Override
             public void run() {
-                db.shutdown();
-                log.info("closing Entity Manager");
-                fullTextEntityManager.close();
-                log.info("closed Entity Manager");
+                log.info("Shutting down Neo4j");
+                if (null != db) {
+                    db.shutdown();
+                    log.info("Neo4j stopped");
+                } else {
+                    log.warn("Neo4j already stopped?");
+                }
+
+                log.info("closing FullText Entity Manager");
+                try {
+                    if (null != fullTextEntityManager) {
+                        if (fullTextEntityManager.isOpen()) {
+                            fullTextEntityManager.close();
+                            log.info("closed FullText Entity Manager");
+                        }
+                    }
+                } catch (IllegalStateException e) {
+                    log.warn("Closing fullTextEntityManager: " + e.getMessage());
+                }
 
             }
         });
@@ -201,7 +219,14 @@ public class ClaviusGraph extends HttpServlet {
 
         long startTime = System.currentTimeMillis();
 
-        EntityManager entityManager = PersistenceListener.getEntityManager();
+        EntityManager entityManager = null;
+
+        try {
+            entityManager = PersistenceListener.getEntityManager();
+        } catch (Exception e) {
+            log.error(e.getMessage());
+            return;
+        }
         synchronized (entityManager) {
             entityManager.getTransaction().begin();
 

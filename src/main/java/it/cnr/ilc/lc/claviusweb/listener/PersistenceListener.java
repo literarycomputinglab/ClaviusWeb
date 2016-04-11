@@ -5,39 +5,79 @@
  */
 package it.cnr.ilc.lc.claviusweb.listener;
 
+import it.cnr.ilc.lc.claviusweb.ClaviusSearch;
 import javax.persistence.EntityManager;
 import javax.persistence.EntityManagerFactory;
 import javax.persistence.Persistence;
 import javax.servlet.ServletContextEvent;
 import javax.servlet.ServletContextListener;
+import javax.servlet.annotation.WebListener;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 /**
  * Web application lifecycle listener.
  *
  * @author simone
  */
+@WebListener
 public class PersistenceListener implements ServletContextListener {
 
     private static EntityManagerFactory entityManagerFactory;
     private static EntityManager entityManager;
+    private static Logger log = LogManager.getLogger(PersistenceListener.class);
 
-    public static synchronized EntityManager getEntityManager() {
-        if (null == entityManagerFactory) {
-            entityManagerFactory = Persistence.createEntityManagerFactory("clavius");
-            if (null == entityManager) {
-                entityManager = entityManagerFactory.createEntityManager();
+    public static synchronized EntityManager getEntityManager() throws Exception {
+
+        try {
+
+            log.info("entityManagerFactory is null? " + (null == entityManagerFactory));
+            if (null == entityManagerFactory) {
+                entityManagerFactory = Persistence.createEntityManagerFactory("clavius");
+                log.info("entityManagerFactory is now open? " + entityManagerFactory.isOpen());
+
+                if (null == entityManager) {
+                    entityManager = entityManagerFactory.createEntityManager();
+                    log.info("entityManager is now open? " + entityManager.isOpen());
+
+                }
             }
+            log.info("entityManager is create successfully");
+        } catch (Exception e) {
+            log.error(e.getStackTrace());
+            throw e;
         }
+
         return entityManager;
     }
 
     @Override
     public void contextInitialized(ServletContextEvent sce) {
-
+        log.info("Listener initialized");
     }
 
     @Override
     public void contextDestroyed(ServletContextEvent sce) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        try {
+            if (null != entityManager) {
+                entityManager.close();
+            } else {
+                log.warn("entityManager is null!");
+            }
+        } catch (IllegalStateException e) {
+            log.error("On close entityManager: " + e.getMessage());
+        }
+
+        try {
+            if (null != entityManagerFactory) {
+                entityManagerFactory.close();
+            } else {
+                log.warn("entityManagerFactory is null!");
+            }
+        } catch (IllegalStateException e) {
+            log.error("On close entityManagerFactory: " + e.getMessage());
+        }
+
+        log.info("Listener destroyed");
     }
 }
