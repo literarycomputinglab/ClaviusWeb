@@ -33,7 +33,7 @@ public class Annotation implements Serializable {
     private Long idNeo4j;
 
     @Field
-    private Long idLetter;
+    private Long idDoc;
 
     @Field
     private Long pageNum;
@@ -94,12 +94,12 @@ public class Annotation implements Serializable {
         this.idNeo4j = idNeo4j;
     }
 
-    public Long getIdLetter() {
-        return idLetter;
+    public Long getIdDoc() {
+        return idDoc;
     }
 
-    public void setIdLetter(Long idLetter) {
-        this.idLetter = idLetter;
+    public void setIdDoc(Long idDoc) {
+        this.idDoc = idDoc;
     }
 
     public Long getPageNum() {
@@ -144,7 +144,7 @@ public class Annotation implements Serializable {
 
     @Override
     public String toString() {
-        return String.format("Letter=(%d) [%d]:[%s] [%s - %s] [%s], %s, %s", this.idLetter, this.id, this.leftContext, this.type, this.matched, this.rightContext, this.concept, this.resourceObject);
+        return String.format("Letter=(%d) [%d]:[%s] [%s - %s] [%s], %s, %s", this.idDoc, this.id, this.leftContext, this.type, this.matched, this.rightContext, this.concept, this.resourceObject);
     }
 
 }

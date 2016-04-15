@@ -150,7 +150,7 @@ public class ClaviusGraph extends HttpServlet {
                 node.setProperty("name", document.name);
                 node.setProperty("code", document.code);
                 node.setProperty("graph", document.graph);
-                node.setProperty("idLetter", document.idLetter);
+                node.setProperty("idDoc", document.idDoc);
                 tx.success();
                 document.id = node.getId();
                 return document;
@@ -168,7 +168,7 @@ public class ClaviusGraph extends HttpServlet {
                 node.setProperty("name", document.name);
                 node.setProperty("code", document.code);
                 node.setProperty("graph", document.graph);
-                node.setProperty("idLetter", document.idLetter);
+                node.setProperty("idDoc", document.idDoc);
 
                 midTime = System.currentTimeMillis();
                 log.info("After neo4j load and set  " + (midTime - startTime) + " ms");
@@ -191,7 +191,7 @@ public class ClaviusGraph extends HttpServlet {
                 document.name = (String) node.getProperty("name", "");
                 document.code = (String) node.getProperty("code", "");
                 document.graph = (String) node.getProperty("graph", "");
-                document.idLetter = (String) node.getProperty("idLetter", "");
+                document.idDoc = (String) node.getProperty("idDoc", "");
 
                 return document;
             }
@@ -206,7 +206,7 @@ public class ClaviusGraph extends HttpServlet {
                     TEADocument document = new TEADocument();
                     document.id = node.getId();
                     document.name = (String) node.getProperty("name", "");
-                    document.idLetter = (String) node.getProperty("idLetter", "");
+                    document.idDoc = (String) node.getProperty("idDoc", "");
 
                     documents.add(document);
                 }
@@ -231,7 +231,7 @@ public class ClaviusGraph extends HttpServlet {
             entityManager.getTransaction().begin();
 
             String plainText = teadoc.text;
-            String idLetter = teadoc.idLetter;
+            String idDoc = teadoc.idDoc;
             List<TEADocument.Triple> triples = teadoc.triples;
             long time1 = System.currentTimeMillis();
 
@@ -246,7 +246,7 @@ public class ClaviusGraph extends HttpServlet {
                     Annotation a = new Annotation();
                     a.setLeftContext(plainText.substring(triple.start > ctxLen ? triple.start - ctxLen : 0, triple.start));
                     a.setRightContext(plainText.substring(triple.end, triple.end + ctxLen < plainText.length() ? triple.end + ctxLen : plainText.length()));
-                    a.setIdLetter(Long.valueOf(idLetter));
+                    a.setIdDoc(Long.valueOf(idDoc));
                     a.setConcept(conceptsMap.getProperty(triple.object.substring(triple.object.lastIndexOf("/") + 1))); //@FIX triple.object sara' la chiave di accesso alla mappa dei concetti
                     a.setType(triple.object.substring(triple.object.lastIndexOf("/") + 1));
                     a.setResourceObject(triple.object);
