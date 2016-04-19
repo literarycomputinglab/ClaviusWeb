@@ -233,6 +233,7 @@ public class ClaviusGraph extends HttpServlet {
             String plainText = teadoc.text;
             String idDoc = teadoc.idDoc;
             List<TEADocument.Triple> triples = teadoc.triples;
+            log.info("TEADocument.Triple: " + triples);
             long time1 = System.currentTimeMillis();
 
             Query query = entityManager.createNativeQuery("DELETE FROM Annotation WHERE idNeo4j = " + teadoc.id);
@@ -240,24 +241,41 @@ public class ClaviusGraph extends HttpServlet {
             long time2 = System.currentTimeMillis();
             log.info("Delete " + deleted + " Annotation(s) in " + (time2 - time1) + " ms");
             int count = 0;
-            if (null != triples) {
+            try {
+                if (null != triples && null != plainText) {
 
-                for (TEADocument.Triple triple : triples) {
-                    Annotation a = new Annotation();
-                    a.setLeftContext(plainText.substring(triple.start > ctxLen ? triple.start - ctxLen : 0, triple.start));
-                    a.setRightContext(plainText.substring(triple.end, triple.end + ctxLen < plainText.length() ? triple.end + ctxLen : plainText.length()));
-                    a.setIdDoc(Long.valueOf(idDoc));
-                    a.setConcept(conceptsMap.getProperty(triple.object.substring(triple.object.lastIndexOf("/") + 1))); //@FIX triple.object sara' la chiave di accesso alla mappa dei concetti
-                    a.setType(triple.object.substring(triple.object.lastIndexOf("/") + 1));
-                    a.setResourceObject(triple.object);
-                    a.setIdNeo4j(teadoc.id);
-                    a.setMatched(plainText.substring(triple.start, triple.end));
-                    entityManager.persist(a);
-                    log.info("createEntity: " + a);
-                    count++;
+                    for (TEADocument.Triple triple : triples) {
+                        log.debug("createEntity, for each triples: 1");
+                        if (isValid(triple) ) {
+                            Annotation a = new Annotation();
+                            log.debug("createEntity, for each triples: 1 plainText.length(): " + plainText.length());
+                            a.setLeftContext(plainText.substring(triple.start > ctxLen ? triple.start - ctxLen : 0, triple.start));
+                            log.debug("createEntity, for each triples: 2");
+                            a.setRightContext(plainText.substring(triple.end, triple.end + ctxLen < plainText.length() ? triple.end + ctxLen : plainText.length()));
+                            log.debug("createEntity, for each triples: 3 " + Long.valueOf(idDoc));
+                            a.setIdDoc(Long.valueOf(idDoc));
+                            log.debug("createEntity, for each triples: 4 (" + conceptsMap.getProperty(triple.object) + ")");
+                            a.setConcept(conceptsMap.getProperty(triple.object)); //@FIX triple.object sara' la chiave di accesso alla mappa dei concetti
+                            log.debug("createEntity, for each triples: 5");
+                            a.setType(conceptsMap.getProperty(triple.object).split(" ")[0]);
+                            log.debug("createEntity, for each triples: 6");
+                            a.setResourceObject(triple.object);
+                            log.debug("createEntity, for each triples: 7");
+                            a.setIdNeo4j(teadoc.id);
+                            log.debug("createEntity, for each triples: 8");
+                            a.setMatched(plainText.substring(triple.start, triple.end));
+                            log.debug("createEntity before persist 9");
+                            System.err.println("createEntity before persist 9");
+                            entityManager.persist(a);
+                            log.info("createEntity: " + a + " persisted");
+                            count++;
+                        }
+                    }
+                } else {
+                    log.info("No triples in json request");
                 }
-            } else {
-                log.info("No triples in json request");
+            } catch (Exception e) {
+                log.error("AAAAAAAAAAAAAAHHHHHHHHHHHHHHH: " + e.getMessage());
             }
             long time3 = System.currentTimeMillis();
             log.info("Created " + count + " Annotation(s) in " + (time3 - time2) + " ms");
@@ -285,16 +303,40 @@ public class ClaviusGraph extends HttpServlet {
             conceptsMap = new Properties();
             conceptsMap.load(input);
         } catch (IOException ex) {
+            log.error(ex.getMessage());
             ex.printStackTrace();
         } finally {
             if (input != null) {
                 try {
                     input.close();
                 } catch (IOException e) {
+                    log.error(e.getMessage());
                     e.printStackTrace();
                 }
             }
         }
+    }
+//"start":4,"end":19,"subject":"j","predicate":"its:termInfoRef","object":"http://claviusontheweb.it/lexicon/math/trapezium"}
+    private boolean isValid(TEADocument.Triple triple) {
+        boolean ret = false;
+        if (null != triple) {
+            if (triple.end != null
+                    && triple.object != null
+                    && triple.predicate != null
+                    && triple.start != null
+                    && triple.subject != null) {
+                if (conceptsMap.containsKey(triple.object)) {
+                    ret = true;
+                } else {
+                    log.warn(triple.object + " is not a concept");
+                }
+            } else {
+                log.warn("triple has some null component(s)");
+            }
+        } else {
+            log.warn("triple is null!");
+        }
+        return ret;
     }
 
 }
