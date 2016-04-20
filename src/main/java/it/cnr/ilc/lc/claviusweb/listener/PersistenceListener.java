@@ -23,8 +23,8 @@ import org.apache.logging.log4j.Logger;
 @WebListener
 public class PersistenceListener implements ServletContextListener {
 
-    private static EntityManagerFactory entityManagerFactory;
-    private static EntityManager entityManager;
+    private static EntityManagerFactory entityManagerFactory = null;
+    private static EntityManager entityManager = null;
     private static Logger log = LogManager.getLogger(PersistenceListener.class);
 
     public static synchronized EntityManager getEntityManager() throws Exception {
@@ -38,9 +38,25 @@ public class PersistenceListener implements ServletContextListener {
 
                 if (null == entityManager) {
                     entityManager = entityManagerFactory.createEntityManager();
-                    log.info("entityManager is now open? " + entityManager.isOpen());
+                    log.info("entityManager was null, is now open? " + entityManager.isOpen());
 
+                } else if (!entityManager.isOpen()) {
+                    entityManager = entityManagerFactory.createEntityManager();
+                    log.info("entityManager was close, is now open? " + entityManager.isOpen());
                 }
+            } else if (!entityManagerFactory.isOpen()) {
+                entityManagerFactory = Persistence.createEntityManagerFactory("clavius");
+                log.info("entityManagerFactory was close, is now open? " + entityManagerFactory.isOpen());
+
+                entityManager = entityManagerFactory.createEntityManager();
+                log.info("entityManager is now open? " + entityManager.isOpen());
+            } else if (null == entityManager) {
+                entityManager = entityManagerFactory.createEntityManager();
+                log.info("entityManager was null, is now open? " + entityManager.isOpen());
+
+            } else if (!entityManager.isOpen()) {
+                entityManager = entityManagerFactory.createEntityManager();
+                log.info("entityManager was close, is now open? " + entityManager.isOpen());
             }
             log.info("entityManager is create successfully");
         } catch (Exception e) {
@@ -61,6 +77,8 @@ public class PersistenceListener implements ServletContextListener {
         try {
             if (null != entityManager) {
                 entityManager.close();
+                log.info("entityManager.close()");
+
             } else {
                 log.warn("entityManager is null!");
             }
@@ -71,6 +89,7 @@ public class PersistenceListener implements ServletContextListener {
         try {
             if (null != entityManagerFactory) {
                 entityManagerFactory.close();
+                log.info("entityManagerFactory.close()");
             } else {
                 log.warn("entityManagerFactory is null!");
             }
