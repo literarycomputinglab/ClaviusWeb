@@ -2,6 +2,7 @@ package it.cnr.ilc.lc.claviusweb;
 
 import com.google.gson.Gson;
 import it.cnr.ilc.lc.claviusweb.entity.Annotation;
+import it.cnr.ilc.lc.claviusweb.entity.PlainText;
 import it.cnr.ilc.lc.claviusweb.entity.TEADocument;
 import it.cnr.ilc.lc.claviusweb.listener.PersistenceListener;
 import java.io.BufferedReader;
@@ -11,6 +12,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import javax.persistence.EntityManager;
+import javax.persistence.EntityManagerFactory;
+import javax.persistence.Persistence;
 import javax.persistence.Query;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
@@ -37,7 +40,7 @@ public class ClaviusGraph extends HttpServlet {
     private static Logger log = LogManager.getLogger(ClaviusGraph.class);
 
     private FullTextEntityManager fullTextEntityManager = null;
-    private static final int ctxLen = 30;
+    private static final int ctxLen = 100;
     private static Properties conceptsMap;
 
     @Override
@@ -217,8 +220,6 @@ public class ClaviusGraph extends HttpServlet {
 
     private void updateLuceneIndex(TEADocument teadoc) {
 
-        long startTime = System.currentTimeMillis();
-
         EntityManager entityManager = null;
 
         try {
@@ -227,7 +228,11 @@ public class ClaviusGraph extends HttpServlet {
             log.error(e.getMessage());
             return;
         }
+
         synchronized (entityManager) {
+
+            fullTextEntityManager = org.hibernate.search.jpa.Search.getFullTextEntityManager(entityManager);
+
             entityManager.getTransaction().begin();
 
             String plainText = teadoc.text;
@@ -235,26 +240,34 @@ public class ClaviusGraph extends HttpServlet {
             List<TEADocument.Triple> triples = teadoc.triples;
             log.info("TEADocument.Triple: " + triples);
             long time1 = System.currentTimeMillis();
-
-            Query query = entityManager.createNativeQuery("DELETE FROM Annotation WHERE idNeo4j = " + teadoc.id);
-            int deleted = query.executeUpdate();
-            long time2 = System.currentTimeMillis();
-            log.info("Delete " + deleted + " Annotation(s) in " + (time2 - time1) + " ms");
-            int count = 0;
+            long time2 = 0;
+            long time3 = 0;
             try {
+
+                Query queryDeletePlainText = entityManager.createNativeQuery("DELETE FROM PlainText WHERE idDoc = \"" + teadoc.idDoc+"\"");
+                int deleted = queryDeletePlainText.executeUpdate();
+                log.info("Delete " + deleted + " Annotation(s)");
+
+                entityManager.persist(createFullTextEntity(teadoc));
+
+                Query query = entityManager.createNativeQuery("DELETE FROM Annotation WHERE idNeo4j = " + teadoc.id);
+                deleted = query.executeUpdate();
+                time2 = System.currentTimeMillis();
+                log.info("Delete " + deleted + " Annotation(s) in " + (time2 - time1) + " ms");
+                int count = 0;
                 if (null != triples && null != plainText) {
 
                     for (TEADocument.Triple triple : triples) {
                         log.debug("createEntity, for each triples: 1");
-                        if (isValid(triple) ) {
+                        if (isValid(triple)) {
                             Annotation a = new Annotation();
                             log.debug("createEntity, for each triples: 1 plainText.length(): " + plainText.length());
                             a.setLeftContext(plainText.substring(triple.start > ctxLen ? triple.start - ctxLen : 0, triple.start));
                             log.debug("createEntity, for each triples: 2");
                             a.setRightContext(plainText.substring(triple.end, triple.end + ctxLen < plainText.length() ? triple.end + ctxLen : plainText.length()));
-                            log.debug("createEntity, for each triples: 3 " + Long.valueOf(idDoc));
-                            a.setIdDoc(Long.valueOf(idDoc));
-                            log.debug("createEntity, for each triples: 4 (" + conceptsMap.getProperty(triple.object) + ")");
+                            log.info("createEntity, for each triples: 3 " + idDoc);
+                            a.setIdDoc(idDoc);
+                            log.info("createEntity, for each triples: 4 (" + conceptsMap.getProperty(triple.object) + ")");
                             a.setConcept(conceptsMap.getProperty(triple.object)); //@FIX triple.object sara' la chiave di accesso alla mappa dei concetti
                             log.debug("createEntity, for each triples: 5");
                             a.setType(conceptsMap.getProperty(triple.object).split(" ")[0]);
@@ -264,8 +277,7 @@ public class ClaviusGraph extends HttpServlet {
                             a.setIdNeo4j(teadoc.id);
                             log.debug("createEntity, for each triples: 8");
                             a.setMatched(plainText.substring(triple.start, triple.end));
-                            log.debug("createEntity before persist 9");
-                            System.err.println("createEntity before persist 9");
+                            log.info("createEntity before persist 9");
                             entityManager.persist(a);
                             log.info("createEntity: " + a + " persisted");
                             count++;
@@ -274,23 +286,49 @@ public class ClaviusGraph extends HttpServlet {
                 } else {
                     log.info("No triples in json request");
                 }
-            } catch (Exception e) {
-                log.error("AAAAAAAAAAAAAAHHHHHHHHHHHHHHH: " + e.getMessage());
-            }
-            long time3 = System.currentTimeMillis();
-            log.info("Created " + count + " Annotation(s) in " + (time3 - time2) + " ms");
+                entityManager.getTransaction().commit();
+                time3 = System.currentTimeMillis();
+                log.info("Created " + count + " Annotation(s) in " + (time3 - time2) + " ms");
 
-            /*try {
-            fullTextEntityManager.createIndexer().startAndWait();
-        } catch (InterruptedException ex) {
-            log.error(ex.getMessage());
-        }*/
-            //fullTextEntityManager.flushToIndexes();
-            entityManager.getTransaction().commit();
-            long time4 = System.currentTimeMillis();
-            log.info("Lucene index commit in " + (time4 - time3) + " ms");
+            } catch (Exception e) {
+                log.error("PPPPPPPPPRRRRRRRRRRRRRRR: ", e);
+            } finally {
+                try {
+                    fullTextEntityManager.createIndexer().startAndWait();
+                } catch (InterruptedException ex) {
+                    log.error(ex.getMessage());
+                }
+                fullTextEntityManager.flushToIndexes();
+                long time4 = System.currentTimeMillis();
+                log.info("Lucene index reindexing in " + (time4 - time3) + " ms");
+
+                if (entityManager.getTransaction().isActive()) {
+                    log.warn("Connection is already active, rolling back!");
+                    entityManager.getTransaction().rollback();
+                }
+                try {
+                    entityManager.close();
+                } catch (Exception e) {
+                    log.error(e.getMessage());
+                }
+            }
 
         }
+    }
+
+    private PlainText createFullTextEntity(TEADocument teadoc) {
+
+        String content = teadoc.text;
+        String idDoc = teadoc.idDoc;
+        String extra = teadoc.name;
+
+        PlainText ft = new PlainText();
+
+        ft.setIdDoc(idDoc);
+        ft.setContent(content);
+        ft.setExtra(extra);
+
+        return ft;
     }
 
     private void readProperies() {
@@ -298,7 +336,8 @@ public class ClaviusGraph extends HttpServlet {
         InputStream input = null;
 
         try {
-            input = ClaviusGraph.class.getResourceAsStream("/concepts-map.properties");
+            input = ClaviusGraph.class
+                    .getResourceAsStream("/concepts-map.properties");
             // load a properties file
             conceptsMap = new Properties();
             conceptsMap.load(input);
@@ -317,6 +356,7 @@ public class ClaviusGraph extends HttpServlet {
         }
     }
 //"start":4,"end":19,"subject":"j","predicate":"its:termInfoRef","object":"http://claviusontheweb.it/lexicon/math/trapezium"}
+
     private boolean isValid(TEADocument.Triple triple) {
         boolean ret = false;
         if (null != triple) {

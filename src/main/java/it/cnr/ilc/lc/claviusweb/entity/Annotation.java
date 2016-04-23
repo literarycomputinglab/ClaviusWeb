@@ -32,8 +32,9 @@ public class Annotation implements Serializable {
     @Field
     private Long idNeo4j;
 
-    @Field
-    private Long idDoc;
+    @Field(analyze = Analyze.NO)
+    @Column
+    private String idDoc;
 
     @Field
     private Long pageNum;
@@ -61,7 +62,6 @@ public class Annotation implements Serializable {
     @Field(analyzer = @Analyzer(impl = WhitespaceAnalyzer.class))
     private String concept;
 
-    
     public String getMatched() {
         return matched;
     }
@@ -94,11 +94,11 @@ public class Annotation implements Serializable {
         this.idNeo4j = idNeo4j;
     }
 
-    public Long getIdDoc() {
+    public String getIdDoc() {
         return idDoc;
     }
 
-    public void setIdDoc(Long idDoc) {
+    public void setIdDoc(String idDoc) {
         this.idDoc = idDoc;
     }
 
@@ -144,7 +144,7 @@ public class Annotation implements Serializable {
 
     @Override
     public String toString() {
-        return String.format("Letter=(%d) [%d]:[%s] [%s - %s] [%s], %s, %s", this.idDoc, this.id, this.leftContext, this.type, this.matched, this.rightContext, this.concept, this.resourceObject);
+        return String.format("idDoc=(%s) [%d]:[%s] [%s - %s] [%s], %s, %s", this.idDoc, this.id, this.leftContext, this.type, this.matched, this.rightContext, this.concept, this.resourceObject);
     }
 
 }

@@ -24,48 +24,63 @@ import org.apache.logging.log4j.Logger;
 public class PersistenceListener implements ServletContextListener {
 
     private static EntityManagerFactory entityManagerFactory = null;
-    private static EntityManager entityManager = null;
     private static Logger log = LogManager.getLogger(PersistenceListener.class);
 
     public static synchronized EntityManager getEntityManager() throws Exception {
 
-        try {
-
-            log.info("entityManagerFactory is null? " + (null == entityManagerFactory));
-            if (null == entityManagerFactory) {
-                entityManagerFactory = Persistence.createEntityManagerFactory("clavius");
-                log.info("entityManagerFactory is now open? " + entityManagerFactory.isOpen());
-
-                if (null == entityManager) {
-                    entityManager = entityManagerFactory.createEntityManager();
-                    log.info("entityManager was null, is now open? " + entityManager.isOpen());
-
-                } else if (!entityManager.isOpen()) {
-                    entityManager = entityManagerFactory.createEntityManager();
-                    log.info("entityManager was close, is now open? " + entityManager.isOpen());
-                }
-            } else if (!entityManagerFactory.isOpen()) {
-                entityManagerFactory = Persistence.createEntityManagerFactory("clavius");
-                log.info("entityManagerFactory was close, is now open? " + entityManagerFactory.isOpen());
-
-                entityManager = entityManagerFactory.createEntityManager();
-                log.info("entityManager is now open? " + entityManager.isOpen());
-            } else if (null == entityManager) {
-                entityManager = entityManagerFactory.createEntityManager();
-                log.info("entityManager was null, is now open? " + entityManager.isOpen());
-
-            } else if (!entityManager.isOpen()) {
-                entityManager = entityManagerFactory.createEntityManager();
-                log.info("entityManager was close, is now open? " + entityManager.isOpen());
-            }
-            log.info("entityManager is create successfully");
-        } catch (Exception e) {
-            log.error(e.getStackTrace());
-            throw e;
+        log.info("entityManagerFactory is null? " + (null == entityManagerFactory));
+        
+        if (null == entityManagerFactory) {
+            entityManagerFactory = Persistence.createEntityManagerFactory("clavius");
+            log.info("entityManagerFactory is now open? " + entityManagerFactory.isOpen());
+        } else if (!entityManagerFactory.isOpen()) {
+            entityManagerFactory = Persistence.createEntityManagerFactory("clavius");
         }
+        return entityManagerFactory.createEntityManager();
 
-        return entityManager;
     }
+
+//    public static synchronized EntityManager getEntityManager2() throws Exception {
+//
+//        try {
+//
+//            log.info("entityManagerFactory is null? " + (null == entityManagerFactory));
+//            if (null == entityManagerFactory) {
+//                entityManagerFactory = Persistence.createEntityManagerFactory("clavius");
+//                log.info("entityManagerFactory is now open? " + entityManagerFactory.isOpen());
+//
+//                if (null == entityManager) {
+//                    entityManager = entityManagerFactory.createEntityManager();
+//                    log.info("entityManager was null, is now open? " + entityManager.isOpen());
+//
+//                } else if (!entityManager.isOpen()) {
+//                    entityManager = entityManagerFactory.createEntityManager();
+//                    log.info("entityManager was close, is now open? " + entityManager.isOpen());
+//                }
+//            } else if (!entityManagerFactory.isOpen()) {
+//                entityManagerFactory = Persistence.createEntityManagerFactory("clavius");
+//                log.info("entityManagerFactory was close, is now open? " + entityManagerFactory.isOpen());
+//
+//                entityManager = entityManagerFactory.createEntityManager();
+//                log.info("entityManager is now open? " + entityManager.isOpen());
+//            } else if (null == entityManager) {
+//                entityManager = entityManagerFactory.createEntityManager();
+//                log.info("entityManager was null, is now open? " + entityManager.isOpen());
+//
+//            } else if (!entityManager.isOpen()) {
+//                entityManager = entityManagerFactory.createEntityManager();
+//                log.info("entityManager was close, is now open? " + entityManager.isOpen());
+//            } else {
+//                entityManager = entityManagerFactory.createEntityManager();
+//                log.info("entityManagerFactory and entityManager are already open");
+//            }
+//            log.info("entityManager is create successfully");
+//        } catch (Exception e) {
+//            log.error(e.getMessage());
+//            throw e;
+//        }
+//        return entityManager;
+//    }
 
     @Override
     public void contextInitialized(ServletContextEvent sce) {
@@ -74,17 +89,17 @@ public class PersistenceListener implements ServletContextListener {
 
     @Override
     public void contextDestroyed(ServletContextEvent sce) {
-        try {
-            if (null != entityManager) {
-                entityManager.close();
-                log.info("entityManager.close()");
-
-            } else {
-                log.warn("entityManager is null!");
-            }
-        } catch (IllegalStateException e) {
-            log.error("On close entityManager: " + e.getMessage());
-        }
+//        try {
+//            if (null != entityManager) {
+//                entityManager.close();
+//                log.info("entityManager.close()");
+//
+//            } else {
+//                log.warn("entityManager is null!");
+//            }
+//        } catch (IllegalStateException e) {
+//            log.error("On close entityManager: " + e.getMessage());
+//        }
 
         try {
             if (null != entityManagerFactory) {
