@@ -27,15 +27,16 @@ import org.apache.logging.log4j.Logger;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.custom.CustomAnalyzer;
-import org.apache.lucene.analysis.pattern.PatternReplaceCharFilterFactory;
-import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.Term;
+import org.apache.lucene.queryparser.analyzing.AnalyzingQueryParser;
 import org.apache.lucene.queryparser.classic.ParseException;
 import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.TopDocs;
+import org.apache.lucene.search.WildcardQuery;
 import org.apache.lucene.search.highlight.InvalidTokenOffsetsException;
 import org.apache.lucene.search.highlight.QueryScorer;
 import org.apache.lucene.search.highlight.SimpleFragmenter;
@@ -55,6 +56,7 @@ public class ClaviusSearch extends HttpServlet {
 
     private static Logger log = LogManager.getLogger(ClaviusSearch.class);
     private FullTextEntityManager fullTextEntityManager = null;
+    private static final int stringLogLenght = 50;
 
     @Override
     public void init(ServletConfig config) throws ServletException {
@@ -121,17 +123,24 @@ public class ClaviusSearch extends HttpServlet {
         response.setCharacterEncoding("UTF-8");
         response.setHeader("Access-Control-Allow-Origin", "*");
 
+        String ip = getClientIpAddr(request);
+
         Gson gson = new Gson();
         String command = request.getPathInfo().substring(1);
         String json = readPost(request);
-        log.info("da readPost() " + json);
-        ClaviusQuery cq = gson.fromJson(json, ClaviusQuery.class);
-        List<Annotation> loa = searchQueryParse(cq.luceneQuery);
+        if ("search".equals(command)) {
+            log.info("[" + ip + "] SEARCH " + trimTo(json, stringLogLenght));
+            ClaviusQuery cq = gson.fromJson(json, ClaviusQuery.class);
+            List<Annotation> loa = searchQueryParse(cq.luceneQuery);
 
-        log.info(loa);
+            log.debug(loa);
 
-        response.getWriter().append(annotationToJson(loa));
-
+            response.getWriter().append(annotationToJson(loa));
+            log.info("Response sent to " + ip + " for query " +cq.luceneQuery);
+        } else {
+            log.error("Unvalid path URI for command " + command + "::" + json + "from ip: " + ip);
+            throw new UnsupportedOperationException("Unvalid path URI for command " + command + "::" + json);
+        }
     }
 
     private String readPost(HttpServletRequest request) throws IOException {
@@ -158,14 +167,18 @@ public class ClaviusSearch extends HttpServlet {
             if (query.contains(":")) {
                 //concept
                 log.info("Request for Concept research: " + query);
-                ret = conceptSearch(query);
+                if (query.startsWith("concept")) {
+                    ret = conceptSearch(query);
+                } else {
+                    log.error("query contains an unknown keyword " + query.substring(0, query.indexOf(":")));
+                }
             } else {
                 //full
                 try {
                     log.info("Request for FullText research: " + query);
                     ret = fullTextSearch(query);
                 } catch (Exception e) {
-                    log.error(e);
+                    log.error("Error processing query " + query, e);
                 }
             }
         }
@@ -175,7 +188,7 @@ public class ClaviusSearch extends HttpServlet {
 
     private List<Annotation> conceptSearch(String query) {
 
-        List result = null;
+        List result = new ArrayList();
         EntityManager entityManager = null;
 
         try {
@@ -185,76 +198,91 @@ public class ClaviusSearch extends HttpServlet {
             log.error(e.getMessage());
             return null;
         }
+        if (null != entityManager) {
+            // synchronized (entityManager) {
+            entityManager.getTransaction().begin();
+            fullTextEntityManager = org.hibernate.search.jpa.Search.getFullTextEntityManager(entityManager);
+            try {
+                log.info("searchQueryParse(" + query + ")");
 
-        // synchronized (entityManager) {
-        entityManager.getTransaction().begin();
-        fullTextEntityManager = org.hibernate.search.jpa.Search.getFullTextEntityManager(entityManager);
-        try {
-            log.info("searchQueryParse(" + query + ")");
+                QueryParser parser = new QueryParser(
+                        "concept",
+                        fullTextEntityManager.getSearchFactory().getAnalyzer(Annotation.class)
+                );
+                log.debug("parser=(" + parser + ")");
 
-            QueryParser parser = new QueryParser(
-                    "concept",
-                    fullTextEntityManager.getSearchFactory().getAnalyzer(Annotation.class)
-            );
-            log.debug("parser=(" + parser + ")");
+                org.apache.lucene.search.Query luceneQuery = parser.parse(query);
+                log.info("luceneQuery " + luceneQuery.toString("concept"));
+                FullTextQuery fullTextQuery
+                        = fullTextEntityManager.createFullTextQuery(luceneQuery, Annotation.class);
 
-            org.apache.lucene.search.Query luceneQuery = parser.parse(query);
-            log.info("luceneQuery " + luceneQuery.toString("concept"));
-            FullTextQuery fullTextQuery
-                    = fullTextEntityManager.createFullTextQuery(luceneQuery, Annotation.class);
+                result = fullTextQuery.getResultList();
+                log.debug("result " + result);
+                entityManager.getTransaction().commit();
 
-            result = fullTextQuery.getResultList();
-            log.info("result " + result);
+            } catch (ParseException | IllegalArgumentException | IllegalStateException | RollbackException | NullPointerException ex) {
+                log.error(ex + " Error in query " + query);
 
-        } catch (ParseException | IllegalArgumentException | IllegalStateException | RollbackException | NullPointerException ex) {
-            log.error(ex + " Error in query " + query);
-
-        } finally {
-            entityManager.close();
+            } finally {
+                try {
+                    entityManager.close();
+                } catch (Exception e) {
+                    log.error(e);
+                }
+            }
         }
         // }
-
+        log.info("Concept Search found " + result.size() + " result(s) for query " + query);
         return result;
     }
 
     private static List<Annotation> fullTextSearch(String term) throws IOException, ParseException, InvalidTokenOffsetsException {
 
-        log.info("searchWithHighlighter (" + term + ")");
-        Directory indexDirectory
-                = FSDirectory.open(Paths.get("/var/lucene/clavius/indexes/it.cnr.ilc.lc.claviusweb.entity.PlainText"));
-        DirectoryReader ireader = DirectoryReader.open(indexDirectory);
-
-        IndexSearcher searcher = new IndexSearcher(ireader);
-
-        Analyzer fullTextAnalyzer = CustomAnalyzer.builder().addCharFilter("patternReplace", "pattern","[\\-\\(\\)\\[\\],\\.;:]","replacement","")
-                .withTokenizer("whitespace")
-                .build();
-
-        QueryParser parser = new QueryParser("content", fullTextAnalyzer);
-        Query query = parser.parse(term);
-
-        TopDocs hits = searcher.search(query, 30);
-
-        SimpleHTMLFormatter htmlFormatter = new SimpleHTMLFormatter();
-        //Highlighter highlighter = new Highlighter(htmlFormatter, new QueryScorer(query));
-        ClaviusHighlighter highlighter = new ClaviusHighlighter(htmlFormatter, new QueryScorer(query));
-        highlighter.setTextFragmenter(new SimpleFragmenter());
+        log.info("fullTextSearch (" + term + ")");
         List<Annotation> result = new ArrayList<>();
-        log.info("hits.totalHits=(" + hits.totalHits + ")");
-        for (int i = 0; i < hits.totalHits; i++) {
-            int id = hits.scoreDocs[i].doc;
-            Document doc = searcher.doc(id);
-            String idDoc = doc.get("idDoc");
-            
-            //String text = doc.get("content");
-            TokenStream tokenStream = TokenSources.getAnyTokenStream(searcher.getIndexReader(), id, "content", fullTextAnalyzer);
 
-            List<Annotation> frag = highlighter.getBestTextClaviusFragments(tokenStream, idDoc, false, 10);//highlighter.getBestFragments(tokenStream, text, 3, "...");
-            for (int j = 0; j < frag.size(); j++) {
-                log.info("idDoc: " + idDoc + ", Annotation[" + j + "] " + frag.get(j).toString());
+        try {
+            Directory indexDirectory
+                    = FSDirectory.open(Paths.get("/var/lucene/clavius/indexes/it.cnr.ilc.lc.claviusweb.entity.PlainText"));
+            DirectoryReader ireader = DirectoryReader.open(indexDirectory);
+
+            IndexSearcher searcher = new IndexSearcher(ireader);
+
+            Analyzer fullTextAnalyzer = CustomAnalyzer.builder().addCharFilter("patternReplace", "pattern", "([\\-\\(\\)\\[\\],\\.;:])", "replacement", " $1 ")
+                    .withTokenizer("whitespace")
+                    .build();
+
+            //QueryParser parserTerm = new QueryParser("content", fullTextAnalyzer);
+//            AnalyzingQueryParser parser = new AnalyzingQueryParser("content", fullTextAnalyzer);
+//            Query query2 = parser.parse(term);
+//            
+            Query query = new WildcardQuery(new Term("content", term));
+            TopDocs hits = searcher.search(query, 30);
+
+            SimpleHTMLFormatter htmlFormatter = new SimpleHTMLFormatter();
+            //Highlighter highlighter = new Highlighter(htmlFormatter, new QueryScorer(query));
+            ClaviusHighlighter highlighter = new ClaviusHighlighter(htmlFormatter, new QueryScorer(query));
+            highlighter.setTextFragmenter(new SimpleFragmenter());
+
+            log.info("hits.totalHits=(" + hits.totalHits + ")");
+            for (int i = 0; i < hits.totalHits; i++) {
+                int id = hits.scoreDocs[i].doc;
+                Document doc = searcher.doc(id);
+                String idDoc = doc.get("idDoc");
+
+                //String text = doc.get("content");
+                TokenStream tokenStream = TokenSources.getAnyTokenStream(searcher.getIndexReader(), id, "content", fullTextAnalyzer);
+
+                List<Annotation> frag = highlighter.getBestTextClaviusFragments(tokenStream, idDoc, false, 10);//highlighter.getBestFragments(tokenStream, text, 3, "...");
+                for (int j = 0; j < frag.size(); j++) {
+                    log.debug("idDoc: " + idDoc + ", Annotation[" + j + "] " + frag.get(j).toString());
+                }
+                result.addAll(frag);
             }
-            result.addAll(frag);
+        } catch (InvalidTokenOffsetsException | IOException e) {
+            log.error(e);
         }
+        log.info("Full Text Search found " + result.size() + " result(s) for term " + term);
         return result;
     }
 
@@ -289,7 +317,7 @@ public class ClaviusSearch extends HttpServlet {
                     = fullTextEntityManager.createFullTextQuery(luceneQuery, Annotation.class);
 
             result = fullTextQuery.getResultList();
-            log.info("result " + result);
+            log.debug("result " + result);
             entityManager.getTransaction().commit();
 
         } catch (ParseException | IllegalArgumentException | IllegalStateException | RollbackException | NullPointerException ex) {
@@ -302,6 +330,7 @@ public class ClaviusSearch extends HttpServlet {
             }
             entityManager.close();
         }
+        log.info("Full Text Search found " + result.size() + " result(s) for query " + query);
 
         return result;
     }
@@ -315,5 +344,37 @@ public class ClaviusSearch extends HttpServlet {
         String json = gson.toJson(loa);
 
         return json;
+    }
+
+    private String trimTo(String s, int limit) {
+        String ret = "";
+        if (null != s) {
+            if (s.length() < limit) {
+                ret = s;
+            } else {
+                ret = s.substring(0, limit) + "...";
+            }
+        }
+        return ret;
+    }
+
+    private String getClientIpAddr(HttpServletRequest request) {
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip == null || ip.length() == 0 || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("Proxy-Client-IP");
+        }
+        if (ip == null || ip.length() == 0 || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("WL-Proxy-Client-IP");
+        }
+        if (ip == null || ip.length() == 0 || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("HTTP_CLIENT_IP");
+        }
+        if (ip == null || ip.length() == 0 || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("HTTP_X_FORWARDED_FOR");
+        }
+        if (ip == null || ip.length() == 0 || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getRemoteAddr();
+        }
+        return ip;
     }
 }

@@ -33,8 +33,8 @@ import org.hibernate.search.annotations.TokenizerDef;
         = {
             @CharFilterDef(factory = PatternReplaceCharFilterFactory.class, params
                     = {
-                @Parameter(name = "pattern", value = "[\\-\\(\\)\\[\\],\\.;:]"),
-                @Parameter(name = "replacement", value = "")
+                @Parameter(name = "pattern", value = "([\\-\\(\\)\\[\\],\\.;:])"),
+                @Parameter(name = "replacement", value = " $1 ")
             })
         }, tokenizer = @TokenizerDef(factory = WhitespaceTokenizerFactory.class))
 

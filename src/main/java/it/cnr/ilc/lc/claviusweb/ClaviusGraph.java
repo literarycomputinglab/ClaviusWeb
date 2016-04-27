@@ -12,8 +12,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import javax.persistence.EntityManager;
-import javax.persistence.EntityManagerFactory;
-import javax.persistence.Persistence;
 import javax.persistence.Query;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
@@ -41,6 +39,7 @@ public class ClaviusGraph extends HttpServlet {
 
     private FullTextEntityManager fullTextEntityManager = null;
     private static final int ctxLen = 100;
+    private static final int stringLogLenght = 50;
     private static Properties conceptsMap;
 
     @Override
@@ -114,25 +113,29 @@ public class ClaviusGraph extends HttpServlet {
         response.setCharacterEncoding("UTF-8");
         response.setHeader("Access-Control-Allow-Origin", "*");
 
+        String ip = getClientIpAddr(request);
+
         Gson gson = new Gson();
         String command = request.getPathInfo().substring(1);
         String json = readPost(request);
         if ("create".equals(command)) {
-            log.info("create " + json);
+            log.info("[" + ip + "] create " + trimTo(json, stringLogLenght));
             response.getWriter().append(gson.toJson(createNode(gson.fromJson(json, TEADocument.class))));
         } else if ("update".equals(command)) {
-            log.info("update " + json);
+            log.info("[" + ip + "] update " + trimTo(json, stringLogLenght));
             response.getWriter().append(gson.toJson(updateNode(gson.fromJson(json, TEADocument.class))));
         } else if ("load".equals(command)) {
-            log.info("load " + json);
+            log.info("[" + ip + "] load " + trimTo(json, stringLogLenght));
             response.getWriter().append(gson.toJson(loadNode(gson.fromJson(json, TEADocument.class))));
         } else if ("list".equals(command)) {
-            log.info("list");
+            log.info("[" + ip + "] list");
             response.getWriter().append(gson.toJson(listNodes()));
         } else {
-            log.error("Unvalid path URI for command " + command + "::" + json);
+            log.error("Unvalid path URI for command " + command + "::" + json + "from ip: " + ip);
             throw new UnsupportedOperationException("Unvalid path URI for command " + command + "::" + json);
         }
+        log.info("Response sent to " + ip + " for command (" + command + ")");
+
     }
 
     private String readPost(HttpServletRequest request) throws IOException {
@@ -244,14 +247,21 @@ public class ClaviusGraph extends HttpServlet {
             long time3 = 0;
             try {
 
-                Query queryDeletePlainText = entityManager.createNativeQuery("DELETE FROM PlainText WHERE idDoc = \"" + teadoc.idDoc+"\"");
+                //FIX Gestire la cancellazione con l'entityManager e non direttamente nel DB Mysql. Altrimenti siamo costretti a fare sempre 
+                // fullTextEntityManager.createIndexer().startAndWait() per mantenere allineato DB e Indice Lucene
+                Query queryDeletePlainText = entityManager.createNativeQuery("DELETE FROM PlainText WHERE idDoc = \"" + teadoc.idDoc + "\"");
                 int deleted = queryDeletePlainText.executeUpdate();
                 log.info("Delete " + deleted + " Annotation(s)");
+                //END TO FIX
 
                 entityManager.persist(createFullTextEntity(teadoc));
 
+                //FIX Gestire la cancellazione con l'entityManager e non direttamente nel DB Mysql. Altrimenti siamo costretti a fare sempre 
+                // fullTextEntityManager.createIndexer().startAndWait() per mantenere allineato DB e Indice Lucene
                 Query query = entityManager.createNativeQuery("DELETE FROM Annotation WHERE idNeo4j = " + teadoc.id);
                 deleted = query.executeUpdate();
+                //END TO FIX
+
                 time2 = System.currentTimeMillis();
                 log.info("Delete " + deleted + " Annotation(s) in " + (time2 - time1) + " ms");
                 int count = 0;
@@ -261,7 +271,7 @@ public class ClaviusGraph extends HttpServlet {
                         log.debug("createEntity, for each triples: 1");
                         if (isValid(triple)) {
                             Annotation a = new Annotation();
-                            log.debug("createEntity, for each triples: 1 plainText.length(): " + plainText.length());
+                            log.info("createEntity, for each triples: 1 plainText.length(): " + plainText.length());
                             a.setLeftContext(plainText.substring(triple.start > ctxLen ? triple.start - ctxLen : 0, triple.start));
                             log.debug("createEntity, for each triples: 2");
                             a.setRightContext(plainText.substring(triple.end, triple.end + ctxLen < plainText.length() ? triple.end + ctxLen : plainText.length()));
@@ -290,8 +300,11 @@ public class ClaviusGraph extends HttpServlet {
                 time3 = System.currentTimeMillis();
                 log.info("Created " + count + " Annotation(s) in " + (time3 - time2) + " ms");
 
-            } catch (Exception e) {
-                log.error("PPPPPPPPPRRRRRRRRRRRRRRR: ", e);
+            } catch (StringIndexOutOfBoundsException e) {
+                log.error("plainText " + plainText + ":\n" + e.getMessage());
+            } catch (Exception ex) {
+                log.error("PPPPPPPPPRRRRRRRRRRRRRRR: ", ex);
+
             } finally {
                 try {
                     fullTextEntityManager.createIndexer().startAndWait();
@@ -379,4 +392,35 @@ public class ClaviusGraph extends HttpServlet {
         return ret;
     }
 
+    private String trimTo(String s, int limit) {
+        String ret = "";
+        if (null != s) {
+            if (s.length() < limit) {
+                ret = s;
+            } else {
+                ret = s.substring(0, limit) + "...";
+            }
+        }
+        return ret;
+    }
+
+    private String getClientIpAddr(HttpServletRequest request) {
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip == null || ip.length() == 0 || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("Proxy-Client-IP");
+        }
+        if (ip == null || ip.length() == 0 || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("WL-Proxy-Client-IP");
+        }
+        if (ip == null || ip.length() == 0 || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("HTTP_CLIENT_IP");
+        }
+        if (ip == null || ip.length() == 0 || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("HTTP_X_FORWARDED_FOR");
+        }
+        if (ip == null || ip.length() == 0 || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getRemoteAddr();
+        }
+        return ip;
+    }
 }
