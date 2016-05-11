@@ -7,12 +7,14 @@ package it.cnr.ilc.lc.claviusweb;
 
 import com.google.gson.Gson;
 import it.cnr.ilc.lc.claviusweb.entity.Annotation;
+import it.cnr.ilc.lc.claviusweb.entity.Concept;
 import it.cnr.ilc.lc.claviusweb.fulltextsearch.ClaviusHighlighter;
 import it.cnr.ilc.lc.claviusweb.listener.PersistenceListener;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import javax.persistence.EntityManager;
 import javax.persistence.RollbackException;
@@ -136,7 +138,14 @@ public class ClaviusSearch extends HttpServlet {
             log.debug(loa);
 
             response.getWriter().append(annotationToJson(loa));
-            log.info("Response sent to " + ip + " for query " +cq.luceneQuery);
+            log.info("Response sent to " + ip + " for query " + cq.luceneQuery);
+        }
+        if ("count".equals(command)) {
+            log.info("[" + ip + "] COUNT " + trimTo(json, stringLogLenght));
+            List<Concept> cs = Arrays.asList(new Gson().fromJson(json, Concept[].class));
+            response.getWriter().append(new Gson().toJson(cs.toArray(), Concept[].class));
+            log.info("Response sent to " + ip + " for COUNT query " + cs.toString());
+
         } else {
             log.error("Unvalid path URI for command " + command + "::" + json + "from ip: " + ip);
             throw new UnsupportedOperationException("Unvalid path URI for command " + command + "::" + json);

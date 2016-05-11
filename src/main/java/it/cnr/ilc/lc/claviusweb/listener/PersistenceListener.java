@@ -5,7 +5,6 @@
  */
 package it.cnr.ilc.lc.claviusweb.listener;
 
-import it.cnr.ilc.lc.claviusweb.ClaviusSearch;
 import javax.persistence.EntityManager;
 import javax.persistence.EntityManagerFactory;
 import javax.persistence.Persistence;
@@ -31,10 +30,10 @@ public class PersistenceListener implements ServletContextListener {
         log.info("entityManagerFactory is null? " + (null == entityManagerFactory));
         
         if (null == entityManagerFactory) {
-            entityManagerFactory = Persistence.createEntityManagerFactory("clavius");
+            entityManagerFactory = Persistence.createEntityManagerFactory("clavius-1.0.3");
             log.info("entityManagerFactory is now open? " + entityManagerFactory.isOpen());
         } else if (!entityManagerFactory.isOpen()) {
-            entityManagerFactory = Persistence.createEntityManagerFactory("clavius");
+            entityManagerFactory = Persistence.createEntityManagerFactory("clavius-1.0.3");
         }
         return entityManagerFactory.createEntityManager();
 
