@@ -59,6 +59,7 @@ public class ClaviusSearch extends HttpServlet {
     private static Logger log = LogManager.getLogger(ClaviusSearch.class);
     private FullTextEntityManager fullTextEntityManager = null;
     private static final int stringLogLenght = 50;
+    private static final int MAX_SEARCH_HITS = 30;
 
     @Override
     public void init(ServletConfig config) throws ServletException {
@@ -252,7 +253,7 @@ public class ClaviusSearch extends HttpServlet {
 
         try {
             Directory indexDirectory
-                    = FSDirectory.open(Paths.get("/var/lucene/clavius/indexes/it.cnr.ilc.lc.claviusweb.entity.PlainText"));
+                    = FSDirectory.open(Paths.get("/var/lucene/clavius-1.0.3/indexes/it.cnr.ilc.lc.claviusweb.entity.PlainText"));
             DirectoryReader ireader = DirectoryReader.open(indexDirectory);
 
             IndexSearcher searcher = new IndexSearcher(ireader);
@@ -266,7 +267,7 @@ public class ClaviusSearch extends HttpServlet {
 //            Query query2 = parser.parse(term);
 //            
             Query query = new WildcardQuery(new Term("content", term));
-            TopDocs hits = searcher.search(query, 30);
+            TopDocs hits = searcher.search(query, MAX_SEARCH_HITS);
 
             SimpleHTMLFormatter htmlFormatter = new SimpleHTMLFormatter();
             //Highlighter highlighter = new Highlighter(htmlFormatter, new QueryScorer(query));

@@ -5,6 +5,7 @@ import it.cnr.ilc.lc.claviusweb.entity.Annotation;
 import it.cnr.ilc.lc.claviusweb.entity.PlainText;
 import it.cnr.ilc.lc.claviusweb.entity.TEADocument;
 import it.cnr.ilc.lc.claviusweb.listener.PersistenceListener;
+import it.cnr.ilc.lc.claviusweb.utilities.WikiDataHandler;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -152,7 +153,7 @@ public class ClaviusGraph extends HttpServlet {
     private TEADocument createNode(TEADocument document) {
         synchronized (db) {
             try (Transaction tx = db.beginTx()) {
-                Node node = db.createNode(() -> "Clavius");
+                Node node = db.createNode(() -> "Clavius_1_0_3");
                 node.setProperty("name", document.name);
                 node.setProperty("code", document.code);
                 node.setProperty("graph", document.graph);
@@ -208,7 +209,7 @@ public class ClaviusGraph extends HttpServlet {
         synchronized (db) {
             try (Transaction tx = db.beginTx()) {
                 List<TEADocument> documents = new ArrayList<>();
-                for (Node node : db.findNodesByLabelAndProperty(() -> "Clavius", null, null)) {
+                for (Node node : db.findNodesByLabelAndProperty(() -> "Clavius_1_0_3", null, null)) {
                     TEADocument document = new TEADocument();
                     document.id = node.getId();
                     document.name = (String) node.getProperty("name", "");
@@ -277,8 +278,14 @@ public class ClaviusGraph extends HttpServlet {
                             a.setRightContext(plainText.substring(triple.end, triple.end + ctxLen < plainText.length() ? triple.end + ctxLen : plainText.length()));
                             log.info("createEntity, for each triples: 3 " + idDoc);
                             a.setIdDoc(idDoc);
+                            //SEARCH FIRST IN CLAVIUS LEXICON AND THEN IN WIKIDATA (IF NO RESULTS FROM CLAVIUS LEXICON)
                             log.info("createEntity, for each triples: 4 (" + conceptsMap.getProperty(triple.object) + ")");
-                            a.setConcept(conceptsMap.getProperty(triple.object)); //@FIX triple.object sara' la chiave di accesso alla mappa dei concetti
+                            if (conceptsMap.containsKey(triple.object)) {
+                                a.setConcept(conceptsMap.getProperty(triple.object)); //@FIX triple.object sara' la chiave di accesso alla mappa dei concetti
+                            } else {
+                                a.setConcept(WikiDataHandler.getInstance().queryStringBuilder(triple.object));
+                            }
+
                             log.debug("createEntity, for each triples: 5");
                             a.setType(conceptsMap.getProperty(triple.object).split(" ")[0]);
                             log.debug("createEntity, for each triples: 6");
