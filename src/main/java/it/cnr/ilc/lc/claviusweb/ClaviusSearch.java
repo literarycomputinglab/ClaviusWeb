@@ -32,7 +32,6 @@ import org.apache.lucene.analysis.custom.CustomAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.Term;
-import org.apache.lucene.queryparser.analyzing.AnalyzingQueryParser;
 import org.apache.lucene.queryparser.classic.ParseException;
 import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.search.IndexSearcher;
@@ -144,6 +143,9 @@ public class ClaviusSearch extends HttpServlet {
         if ("count".equals(command)) {
             log.info("[" + ip + "] COUNT " + trimTo(json, stringLogLenght));
             List<Concept> cs = Arrays.asList(new Gson().fromJson(json, Concept[].class));
+
+            //richiamo la countSearch
+            searchForHits(cs);
             response.getWriter().append(new Gson().toJson(cs.toArray(), Concept[].class));
             log.info("Response sent to " + ip + " for COUNT query " + cs.toString());
 
@@ -244,6 +246,37 @@ public class ClaviusSearch extends HttpServlet {
         // }
         log.info("Concept Search found " + result.size() + " result(s) for query " + query);
         return result;
+    }
+
+    private void searchForHits(List<Concept> loc)  {
+
+        for ( Concept c : loc ) {
+            c.count = countSearch(c.uri);
+        }
+        
+    }
+
+    private static int countSearch(String term) {
+
+        int count = 0;
+        try {
+            Directory indexDirectory
+                    = FSDirectory.open(Paths.get("/var/lucene/clavius-1.0.3/indexes/it.cnr.ilc.lc.claviusweb.entity.Annotation"));
+            DirectoryReader ireader = DirectoryReader.open(indexDirectory);
+
+            IndexSearcher searcher = new IndexSearcher(ireader);
+
+            Query query = new WildcardQuery(new Term("content", term));
+            TopDocs hits = searcher.search(query, Integer.MAX_VALUE);
+            count = hits.totalHits;
+            log.info("Found " + count + " occurrence(s) of " + term);
+            
+        } catch (IOException e) {
+            log.error(e);
+        }
+
+        return count;
+
     }
 
     private static List<Annotation> fullTextSearch(String term) throws IOException, ParseException, InvalidTokenOffsetsException {
