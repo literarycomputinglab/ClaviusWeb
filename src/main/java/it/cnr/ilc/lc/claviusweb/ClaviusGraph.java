@@ -31,6 +31,8 @@ import org.neo4j.rest.graphdb.RestGraphDatabase;
 /**
  *
  * @author oakgen
+ * @author simone
+ * @author angelo
  */
 @WebServlet(name = "ClaviusGraph", urlPatterns = {"/ClaviusGraph/*"})
 public class ClaviusGraph extends HttpServlet {

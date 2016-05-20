@@ -51,6 +51,7 @@ import org.hibernate.search.jpa.FullTextQuery;
 /**
  *
  * @author simone
+ * @author angelo
  */
 @WebServlet(name = "ClaviusSearch", urlPatterns = {"/ClaviusSearch/*"})
 public class ClaviusSearch extends HttpServlet {
@@ -140,7 +141,7 @@ public class ClaviusSearch extends HttpServlet {
             response.getWriter().append(annotationToJson(loa));
             log.info("Response sent to " + ip + " for query " + cq.luceneQuery);
         }
-        if ("count".equals(command)) {
+        else if ("count".equals(command)) {
             log.info("[" + ip + "] COUNT " + trimTo(json, stringLogLenght));
             List<Concept> cs = Arrays.asList(new Gson().fromJson(json, Concept[].class));
 
@@ -150,7 +151,7 @@ public class ClaviusSearch extends HttpServlet {
             log.info("Response sent to " + ip + " for COUNT query " + cs.toString());
 
         } else {
-            log.error("Unvalid path URI for command " + command + "::" + json + "from ip: " + ip);
+            log.error("Invalid path URI for command " + command + "::" + json + "from ip: " + ip);
             throw new UnsupportedOperationException("Unvalid path URI for command " + command + "::" + json);
         }
     }
@@ -256,7 +257,7 @@ public class ClaviusSearch extends HttpServlet {
         
     }
 
-    private static int countSearch(String term) {
+    private static int countSearch(String term) { // replicare il codice della searchConcept
 
         int count = 0;
         try {
@@ -266,7 +267,7 @@ public class ClaviusSearch extends HttpServlet {
 
             IndexSearcher searcher = new IndexSearcher(ireader);
 
-            Query query = new WildcardQuery(new Term("content", term));
+            Query query = new WildcardQuery(new Term("concept", term));
             TopDocs hits = searcher.search(query, Integer.MAX_VALUE);
             count = hits.totalHits;
             log.info("Found " + count + " occurrence(s) of " + term);
