@@ -9,6 +9,7 @@ import it.cnr.ilc.lc.claviusweb.utilities.WikiDataHandler;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -20,6 +21,7 @@ import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import org.apache.commons.validator.routines.UrlValidator;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.hibernate.search.jpa.FullTextEntityManager;
@@ -254,7 +256,7 @@ public class ClaviusGraph extends HttpServlet {
                 // fullTextEntityManager.createIndexer().startAndWait() per mantenere allineato DB e Indice Lucene
                 Query queryDeletePlainText = entityManager.createNativeQuery("DELETE FROM PlainText WHERE idDoc = \"" + teadoc.idDoc + "\"");
                 int deleted = queryDeletePlainText.executeUpdate();
-                log.info("Delete " + deleted + " Annotation(s)");
+                log.info("Delete " + deleted + " Plain Text");
                 //END TO FIX
 
                 entityManager.persist(createFullTextEntity(teadoc));
@@ -280,16 +282,22 @@ public class ClaviusGraph extends HttpServlet {
                             a.setRightContext(plainText.substring(triple.end, triple.end + ctxLen < plainText.length() ? triple.end + ctxLen : plainText.length()));
                             log.info("createEntity, for each triples: 3 " + idDoc);
                             a.setIdDoc(idDoc);
+                            log.debug("createEntity, for each triples: 4");
+                            a.setType("NOT_TYPED");
                             //SEARCH FIRST IN CLAVIUS LEXICON AND THEN IN WIKIDATA (IF NO RESULTS FROM CLAVIUS LEXICON)
-                            log.info("createEntity, for each triples: 4 (" + conceptsMap.getProperty(triple.object) + ")");
+                            log.info("createEntity, for each triples: 5 (" + conceptsMap.getProperty(triple.object) + ")");
                             if (conceptsMap.containsKey(triple.object)) {
                                 a.setConcept(conceptsMap.getProperty(triple.object)); //@FIX triple.object sara' la chiave di accesso alla mappa dei concetti
-                            } else {
+                                a.setType(conceptsMap.getProperty(triple.object).split(" ")[0]);
+
+                            } else if (triple.object.contains("www.wikidata.org")) {
+                                log.info("Object Annotation with wikidata " + triple.object);
                                 a.setConcept(WikiDataHandler.getInstance().queryStringBuilder(triple.object));
+                            } else {
+                                log.info("Object Annotation is not in a hierarchy " + triple.object);
+                                a.setConcept(triple.object);
                             }
 
-                            log.debug("createEntity, for each triples: 5");
-                            a.setType(conceptsMap.getProperty(triple.object).split(" ")[0]);
                             log.debug("createEntity, for each triples: 6");
                             a.setResourceObject(triple.object);
                             log.debug("createEntity, for each triples: 7");
@@ -387,11 +395,20 @@ public class ClaviusGraph extends HttpServlet {
                     && triple.predicate != null
                     && triple.start != null
                     && triple.subject != null) {
+
                 if (conceptsMap.containsKey(triple.object)) {
                     ret = true;
                 } else {
-                    log.warn(triple.object + " is not a concept");
+                    log.warn(triple.object + " is not a lex concept..");
+
+                    if (new UrlValidator().isValid(triple.object)) {
+                        ret = true;
+                        log.info(triple.object + " .. but is a valid URL");
+                    } else {
+                        log.warn(triple.object + " ..and is not a valid URI");
+                    }
                 }
+
             } else {
                 log.warn("triple has some null component(s)");
             }

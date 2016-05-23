@@ -59,6 +59,7 @@ public class Annotation implements Serializable {
     @Facet
     private String resourceObject; //object della tripla
 
+    @Column(length = 4096)
     @Field(analyzer = @Analyzer(impl = WhitespaceAnalyzer.class))
     private String concept;
 

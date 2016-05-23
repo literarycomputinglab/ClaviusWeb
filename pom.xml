@@ -91,6 +91,14 @@
             <artifactId>HikariCP</artifactId>
             <version>2.4.5</version>
         </dependency>
+        
+
+        <dependency>
+            <groupId>commons-validator</groupId>
+            <artifactId>commons-validator</artifactId>
+            <version>1.5.1</version>
+        </dependency>
+
 
         <dependency>
             <groupId>org.apache.lucene</groupId>
@@ -107,7 +115,7 @@
             <artifactId>jena-arq</artifactId>
             <version>3.0.1</version>
         </dependency>
-         <dependency>
+        <dependency>
             <groupId>org.apache.jena</groupId>
             <artifactId>jena-querybuilder</artifactId>
             <version>3.0.1</version>

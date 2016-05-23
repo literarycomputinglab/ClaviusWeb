@@ -42,7 +42,7 @@ public class WikiDataHandler {
         // queryStatic(); //OK
         //queryBinding("<http://www.wikidata.org/entity/Q405>"); //KIO
         //querySelectBuilder("<http://www.wikidata.org/entity/Q405>"); //KIO
-       //queryStringBuilder("<http://www.wikidata.org/entity/Q405>"); //OK 
+        //queryStringBuilder("<http://www.wikidata.org/entity/Q405>"); //OK 
     }
 
     private static void queryStatic() {
@@ -108,6 +108,13 @@ public class WikiDataHandler {
     }
 
     public String queryStringBuilder(String URI) {
+        String _uri;
+
+        if (!URI.startsWith("<") && !URI.endsWith(">")) {
+            _uri = "<" + URI + ">";
+        } else {
+            _uri = URI;
+        }
 
         log.info("URI " + URI);
         String ret;
@@ -123,9 +130,9 @@ public class WikiDataHandler {
                 + "}";
 
         // now creating query object
-        Query query = QueryFactory.create(head + URI + tail);
+        Query query = QueryFactory.create(head + _uri + tail);
 
-        log.debug("query\n" + query.toString());
+        log.info("query\n" + query.toString());
 
 // initializing queryExecution factory with remote service.
 // **this actually was the main problem I couldn't figure out.**
@@ -158,7 +165,7 @@ public class WikiDataHandler {
             qexec.close();
         }
         ret = sb.toString();
-        
+
         log.info("Found " + ret + " URI(s)");
 
         return ret;
@@ -260,6 +267,11 @@ public class WikiDataHandler {
         } finally {
             qexec.close();
         }
+    }
+
+    public static void main(String[] args) {
+        WikiDataHandler handler = WikiDataHandler.getInstance();
+        System.out.println(handler.queryStringBuilder("http://www.wikidata.org/entity/Q7547"));
     }
 
 }
