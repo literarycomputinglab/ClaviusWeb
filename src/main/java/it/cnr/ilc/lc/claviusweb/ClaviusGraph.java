@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Properties;
 import javax.persistence.EntityManager;
 import javax.persistence.Query;
+import javax.persistence.RollbackException;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
@@ -24,7 +25,10 @@ import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.validator.routines.UrlValidator;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.apache.lucene.queryparser.classic.ParseException;
+import org.apache.lucene.queryparser.classic.QueryParser;
 import org.hibernate.search.jpa.FullTextEntityManager;
+import org.hibernate.search.jpa.FullTextQuery;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Transaction;
@@ -45,6 +49,7 @@ public class ClaviusGraph extends HttpServlet {
     private FullTextEntityManager fullTextEntityManager = null;
     private static final int ctxLen = 100;
     private static final int stringLogLenght = 50;
+    private static final int mediumStringLogLenght = 200;
     private static Properties conceptsMap;
 
     @Override
@@ -276,37 +281,48 @@ public class ClaviusGraph extends HttpServlet {
                         log.debug("createEntity, for each triples: 1");
                         if (isValid(triple)) {
                             Annotation a = new Annotation();
-                            log.info("createEntity, for each triples: 1 plainText.length(): " + plainText.length());
+                            log.info("plainText: " + trimTo(plainText, mediumStringLogLenght) + " len=("+plainText.length()+")");
+                            
                             a.setLeftContext(plainText.substring(triple.start > ctxLen ? triple.start - ctxLen : 0, triple.start));
-                            log.debug("createEntity, for each triples: 2");
+                            log.debug("createEntity: left context: " + a.getLeftContext());
+                            
                             a.setRightContext(plainText.substring(triple.end, triple.end + ctxLen < plainText.length() ? triple.end + ctxLen : plainText.length()));
-                            log.info("createEntity, for each triples: 3 " + idDoc);
+                            log.debug("createEntity: right context: " + a.getRightContext());
+                            
                             a.setIdDoc(idDoc);
-                            log.debug("createEntity, for each triples: 4");
+                            log.debug("createEntity: idDoc: " + a.getIdDoc());
+
                             a.setType("NOT_TYPED");
                             //SEARCH FIRST IN CLAVIUS LEXICON AND THEN IN WIKIDATA (IF NO RESULTS FROM CLAVIUS LEXICON)
-                            log.info("createEntity, for each triples: 5 (" + conceptsMap.getProperty(triple.object) + ")");
+                            log.debug("createEntity: is " + triple.object + "  contained in map? " + conceptsMap.containsKey(triple.object));
                             if (conceptsMap.containsKey(triple.object)) {
                                 a.setConcept(conceptsMap.getProperty(triple.object)); //@FIX triple.object sara' la chiave di accesso alla mappa dei concetti
                                 a.setType(conceptsMap.getProperty(triple.object).split(" ")[0]);
 
                             } else if (triple.object.contains("www.wikidata.org")) {
                                 log.info("Object Annotation with wikidata " + triple.object);
-                                a.setConcept(WikiDataHandler.getInstance().queryStringBuilder(triple.object));
+                                //FORZATA L'AGGIUNTA IL RESOURCEOBJECT NEL CONCEPT per facilitare la ricerca da TEA!
+                                a.setConcept(triple.object + " " + getWikiConcept(triple.object));
                             } else {
                                 log.info("Object Annotation is not in a hierarchy " + triple.object);
                                 a.setConcept(triple.object);
                             }
 
-                            log.debug("createEntity, for each triples: 6");
                             a.setResourceObject(triple.object);
-                            log.debug("createEntity, for each triples: 7");
+                            log.debug("resourceObject: " + a.getResourceObject());
+
                             a.setIdNeo4j(teadoc.id);
-                            log.debug("createEntity, for each triples: 8");
+                            log.debug("id: " + a.getIdNeo4j());
+
                             a.setMatched(plainText.substring(triple.start, triple.end));
-                            log.info("createEntity before persist 9");
+                            log.debug("Match: " + a.getMatched());
+
+                            a.setPredicate(triple.predicate);
+                            log.debug("Predicate: " + a.getPredicate());
+
                             entityManager.persist(a);
                             log.info("createEntity: " + a + " persisted");
+
                             count++;
                         }
                     }
@@ -318,7 +334,7 @@ public class ClaviusGraph extends HttpServlet {
                 log.info("Created " + count + " Annotation(s) in " + (time3 - time2) + " ms");
 
             } catch (StringIndexOutOfBoundsException e) {
-                log.error("plainText " + plainText + ":\n" + e.getMessage());
+                log.error("plainText: " + plainText + ":\n" + e.getMessage());
             } catch (Exception ex) {
                 log.error("PPPPPPPPPRRRRRRRRRRRRRRR: ", ex);
 
@@ -331,6 +347,7 @@ public class ClaviusGraph extends HttpServlet {
                 fullTextEntityManager.flushToIndexes();
                 long time4 = System.currentTimeMillis();
                 log.info("Lucene index reindexing in " + (time4 - time3) + " ms");
+                log.info("Total Updating time " + (time4 - time1) + " ms");
 
                 if (entityManager.getTransaction().isActive()) {
                     log.warn("Connection is already active, rolling back!");
@@ -399,13 +416,12 @@ public class ClaviusGraph extends HttpServlet {
                 if (conceptsMap.containsKey(triple.object)) {
                     ret = true;
                 } else {
-                    log.warn(triple.object + " is not a lex concept..");
-
+                    log.info(trimTo(triple.object, mediumStringLogLenght) + " is not a lex concept ...");
                     if (new UrlValidator().isValid(triple.object)) {
                         ret = true;
-                        log.info(triple.object + " .. but is a valid URL");
+                        log.info(trimTo(triple.object, mediumStringLogLenght) + " ... but is a valid URL");
                     } else {
-                        log.warn(triple.object + " ..and is not a valid URI");
+                        log.warn(trimTo(triple.object, mediumStringLogLenght) + " ... and is not a valid URI");
                     }
                 }
 
@@ -448,5 +464,71 @@ public class ClaviusGraph extends HttpServlet {
             ip = request.getRemoteAddr();
         }
         return ip;
+    }
+
+    private String getWikiConcept(String query) {
+
+        String ret = "";
+
+        List<Annotation> result = new ArrayList();
+        EntityManager entityManager = null;
+
+        try {
+            entityManager = PersistenceListener.getEntityManager();
+
+        } catch (Exception e) {
+            log.error(e.getMessage());
+            return null;
+        }
+        if (null != entityManager) {
+            // synchronized (entityManager) {
+            entityManager.getTransaction().begin();
+            fullTextEntityManager = org.hibernate.search.jpa.Search.getFullTextEntityManager(entityManager);
+            try {
+                log.info("searchQueryParse(" + query + ")");
+
+                QueryParser parser = new QueryParser(
+                        "resourceObject",
+                        fullTextEntityManager.getSearchFactory().getAnalyzer(Annotation.class)
+                );
+                log.debug("parser=(" + parser + ")");
+
+                org.apache.lucene.search.Query luceneQuery = parser.parse("\"" + query + "\"");
+                log.info("luceneQuery " + luceneQuery.toString("resourceObject"));
+
+                FullTextQuery fullTextQuery
+                        = fullTextEntityManager.createFullTextQuery(luceneQuery, Annotation.class);
+
+                result = fullTextQuery.getResultList();
+                log.debug("result " + result);
+                entityManager.getTransaction().commit();
+
+            } catch (ParseException | IllegalArgumentException | IllegalStateException | RollbackException | NullPointerException ex) {
+                log.error(ex + " Error in query " + query);
+
+            } finally {
+                try {
+                    entityManager.close();
+                } catch (Exception e) {
+                    log.error(e);
+                }
+            }
+        }
+        // }
+        log.info("Concept Search found " + result.size() + " result(s) for query " + query);
+
+        if (result.isEmpty()) {
+            log.info("wikidata is not cached");
+            ret = WikiDataHandler.getInstance().queryStringBuilder(query);
+
+        } else {
+            Annotation annTmp = result.get(0);
+            String conceptTmp = annTmp.getConcept();
+            ret = conceptTmp.replace(query, "");
+            log.info(" wiki data cached: " + ret);
+
+        }
+        return ret;
+
     }
 }

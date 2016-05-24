@@ -59,6 +59,10 @@ public class Annotation implements Serializable {
     @Facet
     private String resourceObject; //object della tripla
 
+    @Column(length = 1024)
+    @Field(analyze = Analyze.NO)
+    private String predicate;
+
     @Column(length = 4096)
     @Field(analyzer = @Analyzer(impl = WhitespaceAnalyzer.class))
     private String concept;
@@ -133,6 +137,14 @@ public class Annotation implements Serializable {
 
     public void setResourceObject(String resourceObject) {
         this.resourceObject = resourceObject;
+    }
+
+    public String getPredicate() {
+        return predicate;
+    }
+
+    public void setPredicate(String predicate) {
+        this.predicate = predicate;
     }
 
     public String getConcept() {

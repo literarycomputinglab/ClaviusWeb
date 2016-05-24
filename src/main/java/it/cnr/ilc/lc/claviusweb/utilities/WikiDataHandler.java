@@ -5,6 +5,11 @@
  */
 package it.cnr.ilc.lc.claviusweb.utilities;
 
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
 import org.apache.jena.arq.querybuilder.SelectBuilder;
 import org.apache.jena.graph.NodeFactory;
 import org.apache.jena.query.DatasetFactory;
@@ -107,7 +112,7 @@ public class WikiDataHandler {
         }
     }
 
-    public String queryStringBuilder(String URI) {
+    public String queryStringBuilderOld(String URI) {
         String _uri;
 
         if (!URI.startsWith("<") && !URI.endsWith(">")) {
@@ -121,7 +126,7 @@ public class WikiDataHandler {
         StringBuilder sb = new StringBuilder();
 
         CharSequence head = "PREFIX wdt: <http://www.wikidata.org/prop/direct/>\n"
-                + "SELECT DISTINCT ?class\n"
+                + "SELECT  ?class\n"
                 + "WHERE\n"
                 + "{ ";
 
@@ -170,6 +175,78 @@ public class WikiDataHandler {
 
         return ret;
     }
+
+    public String queryStringBuilder(String URI) {
+        String _uri;
+
+        if (!URI.startsWith("<") && !URI.endsWith(">")) {
+            _uri = "<" + URI + ">";
+        } else {
+            _uri = URI;
+        }
+
+        log.info("URI " + URI);
+        List<String> ret = new ArrayList<>();
+        StringBuilder sb = new StringBuilder();
+
+        CharSequence head = "PREFIX wdt: <http://www.wikidata.org/prop/direct/>\n"
+                + "SELECT  ?class\n"
+                + "WHERE\n"
+                + "{ ";
+
+        CharSequence tail = " wdt:P31 ?sclass .\n"
+                + "    ?sclass (wdt:P279)* ?class .\n"
+                + "}";
+
+        // now creating query object
+        Query query = QueryFactory.create(head + _uri + tail);
+
+        log.info("query\n" + query.toString());
+
+// initializing queryExecution factory with remote service.
+// **this actually was the main problem I couldn't figure out.**
+        QueryExecution qexec = QueryExecutionFactory.sparqlService("http://query.wikidata.org/sparql", query);
+
+//after it goes standard query execution and result processing which can
+// be found in almost any Jena/SPARQL tutorial.
+        try {
+            ResultSet results = qexec.execSelect();
+            //System.err.println("result set " + results + " for " + query.getGraphURIs());
+
+            if (!results.hasNext()) {
+                log.info("No results found!");
+            }
+
+            while (results.hasNext()) {
+                QuerySolution binding = results.nextSolution();
+                // System.err.println("binding " + binding.toString());
+                Resource obj = binding.getResource("class");
+                log.debug("sclass: " + obj.getURI());
+
+                ret.add(obj.getURI());
+                
+            }
+
+        } finally {
+            qexec.close();
+        }
+
+        log.info("Found " + ret.size() + " URI(s)");
+
+        Set<String> set = new LinkedHashSet<>(ret);
+        
+        
+        for (Iterator<String> it = set.iterator(); it.hasNext();) {
+            
+            sb.append(it.next());
+            if (it.hasNext()) {
+                sb.append(" ");
+            }
+        }
+        
+        return sb.toString();
+    }
+    
 
 //    String queryString
 //                = "PREFIX wdt: <http://www.wikidata.org/prop/direct/>\n"
@@ -271,7 +348,8 @@ public class WikiDataHandler {
 
     public static void main(String[] args) {
         WikiDataHandler handler = WikiDataHandler.getInstance();
-        System.out.println(handler.queryStringBuilder("http://www.wikidata.org/entity/Q7547"));
+        System.out.println(handler.queryStringBuilderOld("http://www.wikidata.org/entity/Q279881"));
+        System.out.println(handler.queryStringBuilder("http://www.wikidata.org/entity/Q279881"));
     }
 
 }
