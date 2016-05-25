@@ -281,14 +281,14 @@ public class ClaviusGraph extends HttpServlet {
                         log.debug("createEntity, for each triples: 1");
                         if (isValid(triple)) {
                             Annotation a = new Annotation();
-                            log.info("plainText: " + trimTo(plainText, mediumStringLogLenght) + " len=("+plainText.length()+")");
-                            
+                            log.info("plainText: " + trimTo(plainText, mediumStringLogLenght) + " len=(" + plainText.length() + ")");
+
                             a.setLeftContext(plainText.substring(triple.start > ctxLen ? triple.start - ctxLen : 0, triple.start));
                             log.debug("createEntity: left context: " + a.getLeftContext());
-                            
+
                             a.setRightContext(plainText.substring(triple.end, triple.end + ctxLen < plainText.length() ? triple.end + ctxLen : plainText.length()));
                             log.debug("createEntity: right context: " + a.getRightContext());
-                            
+
                             a.setIdDoc(idDoc);
                             log.debug("createEntity: idDoc: " + a.getIdDoc());
 
@@ -321,7 +321,7 @@ public class ClaviusGraph extends HttpServlet {
                             log.debug("Predicate: " + a.getPredicate());
 
                             entityManager.persist(a);
-                            log.info("createEntity: " + a + " persisted");
+                            log.info("createEntity: " + trimTo(a.toString(), mediumStringLogLenght) + " persisted");
 
                             count++;
                         }
@@ -416,12 +416,12 @@ public class ClaviusGraph extends HttpServlet {
                 if (conceptsMap.containsKey(triple.object)) {
                     ret = true;
                 } else {
-                    log.info(trimTo(triple.object, mediumStringLogLenght) + " is not a lex concept ...");
+                    log.debug(trimTo(triple.object, mediumStringLogLenght) + " is not a lex concept ...");
                     if (new UrlValidator().isValid(triple.object)) {
                         ret = true;
-                        log.info(trimTo(triple.object, mediumStringLogLenght) + " ... but is a valid URL");
+                        log.debug(trimTo(triple.object, mediumStringLogLenght) + " ... but is a valid URL");
                     } else {
-                        log.warn(trimTo(triple.object, mediumStringLogLenght) + " ... and is not a valid URI");
+                        log.debug(trimTo(triple.object, mediumStringLogLenght) + " ... and is not a valid URI");
                     }
                 }
 
@@ -468,10 +468,14 @@ public class ClaviusGraph extends HttpServlet {
 
     private String getWikiConcept(String query) {
 
+        log.info("getWikiConcept(" + query + ")");
+
         String ret = "";
 
         List<Annotation> result = new ArrayList();
         EntityManager entityManager = null;
+
+        long time1 = System.currentTimeMillis();
 
         try {
             entityManager = PersistenceListener.getEntityManager();
@@ -485,16 +489,15 @@ public class ClaviusGraph extends HttpServlet {
             entityManager.getTransaction().begin();
             fullTextEntityManager = org.hibernate.search.jpa.Search.getFullTextEntityManager(entityManager);
             try {
-                log.info("searchQueryParse(" + query + ")");
 
                 QueryParser parser = new QueryParser(
                         "resourceObject",
                         fullTextEntityManager.getSearchFactory().getAnalyzer(Annotation.class)
                 );
-                log.debug("parser=(" + parser + ")");
+                log.debug("getWikiConcept - parser=(" + parser + ")");
 
                 org.apache.lucene.search.Query luceneQuery = parser.parse("\"" + query + "\"");
-                log.info("luceneQuery " + luceneQuery.toString("resourceObject"));
+                log.info("getWikiConcept - luceneQuery " + luceneQuery.toString("resourceObject"));
 
                 FullTextQuery fullTextQuery
                         = fullTextEntityManager.createFullTextQuery(luceneQuery, Annotation.class);
@@ -513,21 +516,32 @@ public class ClaviusGraph extends HttpServlet {
                     log.error(e);
                 }
             }
+            long time2 = System.currentTimeMillis();
+            log.info("Search in cache: " + (time2 - time1) + "ms");
         }
         // }
         log.info("Concept Search found " + result.size() + " result(s) for query " + query);
 
         if (result.isEmpty()) {
             log.info("wikidata is not cached");
+            long time3 = System.currentTimeMillis();
+
             ret = WikiDataHandler.getInstance().queryStringBuilder(query);
+
+            long time4 = System.currentTimeMillis();
+            log.info("Search on Wikidata: " + (time4 - time3) + "ms");
 
         } else {
             Annotation annTmp = result.get(0);
             String conceptTmp = annTmp.getConcept();
             ret = conceptTmp.replace(query, "");
-            log.info(" wiki data cached: " + ret);
+            log.info("wikidata info in cache are: (" + ret + ")");
 
         }
+
+        long time5 = System.currentTimeMillis();
+        log.info("getWikiConcept() total time: " + (time5 - time1) + "ms");
+
         return ret;
 
     }

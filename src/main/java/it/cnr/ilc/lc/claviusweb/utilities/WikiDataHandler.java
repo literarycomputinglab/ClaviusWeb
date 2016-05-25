@@ -23,6 +23,7 @@ import org.apache.jena.query.ResultSet;
 import org.apache.jena.rdf.model.Resource;
 import org.apache.jena.rdf.model.ResourceFactory;
 import org.apache.jena.sparql.core.Var;
+import org.apache.jena.sparql.engine.http.QueryEngineHTTP;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -190,29 +191,41 @@ public class WikiDataHandler {
         StringBuilder sb = new StringBuilder();
 
         CharSequence head = "PREFIX wdt: <http://www.wikidata.org/prop/direct/>\n"
+                + "PREFIX hint: <http://www.bigdata.com/queryHints#>\n"
                 + "SELECT  ?class\n"
                 + "WHERE\n"
                 + "{ ";
+        //+ "{ \n  hint:Query hint:optimizer \"None\" . ";
 
-        CharSequence tail = " wdt:P31 ?sclass .\n"
+        CharSequence tail = " wdt:P31/wdt:P279* ?class .\n"
+                + "}";
+        CharSequence tail2 = " wdt:P31 ?sclass .\n"
                 + "    ?sclass (wdt:P279)* ?class .\n"
                 + "}";
-
+        
         // now creating query object
         Query query = QueryFactory.create(head + _uri + tail);
+        //Query query = QueryFactory.create(q);
 
-        log.info("query\n" + query.toString());
-
+        //log.info("query\n" + query.toString());
 // initializing queryExecution factory with remote service.
 // **this actually was the main problem I couldn't figure out.**
+        long time1 = System.currentTimeMillis();
+
         QueryExecution qexec = QueryExecutionFactory.sparqlService("http://query.wikidata.org/sparql", query);
+
+        //QueryEngineHTTP qexec = new QueryEngineHTTP("http://query.wikidata.org/sparql", head + _uri + tail);
+        long time2 = System.currentTimeMillis();
+        log.info("QueryExecutionFactory.sparqlService in " + (time2 - time1) + "ms");
 
 //after it goes standard query execution and result processing which can
 // be found in almost any Jena/SPARQL tutorial.
         try {
             ResultSet results = qexec.execSelect();
-            //System.err.println("result set " + results + " for " + query.getGraphURIs());
+            long time3 = System.currentTimeMillis();
+            log.info("qexec.execSelect() in " + (time3 - time2) + "ms");
 
+            //System.err.println("result set " + results + " for " + query.getGraphURIs());
             if (!results.hasNext()) {
                 log.info("No results found!");
             }
@@ -224,29 +237,28 @@ public class WikiDataHandler {
                 log.debug("sclass: " + obj.getURI());
 
                 ret.add(obj.getURI());
-                
+
             }
+            long time4 = System.currentTimeMillis();
+            log.info("Found " + ret.size() + " URI(s) in " + (time4 - time3) + "ms");
 
         } finally {
             qexec.close();
         }
 
-        log.info("Found " + ret.size() + " URI(s)");
-
         Set<String> set = new LinkedHashSet<>(ret);
-        
-        
+
         for (Iterator<String> it = set.iterator(); it.hasNext();) {
-            
+
             sb.append(it.next());
             if (it.hasNext()) {
                 sb.append(" ");
             }
         }
-        
+        long time5 = System.currentTimeMillis();
+        log.info("Total time: " + (time5 - time1) + "ms");
         return sb.toString();
     }
-    
 
 //    String queryString
 //                = "PREFIX wdt: <http://www.wikidata.org/prop/direct/>\n"
@@ -270,7 +282,7 @@ public class WikiDataHandler {
         System.err.println("1A query\n" + sb.toString());
         System.err.println("1B query\n" + query.toString());
 
-        QueryExecution qexec = QueryExecutionFactory.sparqlService("http://query.wikidata.org/sparql", query);
+        QueryExecution qexec = QueryExecutionFactory.sparqlService("query.wikidata.org/sparql", query);
 
         System.err.println("2");
 
@@ -348,7 +360,6 @@ public class WikiDataHandler {
 
     public static void main(String[] args) {
         WikiDataHandler handler = WikiDataHandler.getInstance();
-        System.out.println(handler.queryStringBuilderOld("http://www.wikidata.org/entity/Q279881"));
         System.out.println(handler.queryStringBuilder("http://www.wikidata.org/entity/Q279881"));
     }
 

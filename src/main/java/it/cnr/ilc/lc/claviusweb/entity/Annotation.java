@@ -157,7 +157,7 @@ public class Annotation implements Serializable {
 
     @Override
     public String toString() {
-        return String.format("idDoc=(%s) [%d]:[%s] [%s - %s] [%s], %s, %s", this.idDoc, this.id, this.leftContext, this.type, this.matched, this.rightContext, this.concept, this.resourceObject);
+        return String.format("idDoc=(%s) [%d]: [%s] [%s - %s] [%s], %s, %s", this.idDoc, this.id, this.leftContext, this.type, this.matched, this.rightContext, this.concept, this.resourceObject);
     }
 
 }
