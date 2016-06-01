@@ -246,6 +246,7 @@ public class WikiDataHandler {
             qexec.close();
         }
 
+        //Elimino i duplicati senza perdere l'ordine della risposta
         Set<String> set = new LinkedHashSet<>(ret);
 
         for (Iterator<String> it = set.iterator(); it.hasNext();) {

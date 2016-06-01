@@ -17,6 +17,7 @@ import org.apache.lucene.analysis.Token;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
 import org.apache.lucene.analysis.tokenattributes.OffsetAttribute;
+import org.apache.lucene.document.Document;
 import org.apache.lucene.search.highlight.Encoder;
 import org.apache.lucene.search.highlight.Formatter;
 import org.apache.lucene.search.highlight.Fragmenter;
@@ -33,9 +34,8 @@ public class ClaviusHighlighter extends Highlighter {
 
     private static Logger log = LogManager.getLogger(ClaviusHighlighter.class);
 
-    
     private static final int ctxLenght = 20;
-    
+
     Formatter formatter;
 
     public ClaviusHighlighter(Scorer fragmentScorer) {
@@ -56,7 +56,7 @@ public class ClaviusHighlighter extends Highlighter {
 
     public final List<Annotation> getBestTextClaviusFragments(
             TokenStream tokenStream,
-            String idDoc,
+            Document document,
             boolean mergeContiguousFragments,
             int maxNumFragments)
             throws IOException, InvalidTokenOffsetsException {
@@ -112,14 +112,14 @@ public class ClaviusHighlighter extends Highlighter {
                 tokenGroup.addToken(fragmentScorer.getTokenScore());
 
             }// END FOR
-             //log.info("tokenGroup.getNumTokens() B: " + tokenGroup.getNumTokens());
+            //log.info("tokenGroup.getNumTokens() B: " + tokenGroup.getNumTokens());
 
             for (int i = 0; i < tokenGroup.getNumTokens(); i++) {
                 //log.info("tokenGroup[" + i + "]: token: " + tokenGroup.getToken(i) + ", score: " + tokenGroup.getScore(i));
                 if (tokenGroup.getScore(i) > 0) {
                     Annotation a = new Annotation();
                     a.setMatched(tokenGroup.getToken(i).toString());
-                    a.setIdDoc(idDoc);
+                    a.setIdDoc(document.get("idDoc"));
                     //contesto sinistro
                     Token[] t = Arrays.copyOfRange(tokenGroup.getTokens(), (i > ctxLenght) ? i - ctxLenght : 0, i);
                     StringBuilder sb = new StringBuilder();
@@ -132,7 +132,7 @@ public class ClaviusHighlighter extends Highlighter {
                     a.setLeftContext(sb.toString());
                     sb.setLength(0);
                     //contesto destro
-                    t = Arrays.copyOfRange(tokenGroup.getTokens(), i + 1, (i + ctxLenght +1 < tokenGroup.getNumTokens() ? i + ctxLenght+1 : tokenGroup.getNumTokens()));
+                    t = Arrays.copyOfRange(tokenGroup.getTokens(), i + 1, (i + ctxLenght + 1 < tokenGroup.getNumTokens() ? i + ctxLenght + 1 : tokenGroup.getNumTokens()));
                     sb = new StringBuilder();
                     for (int j = 0; j < t.length; j++) {
                         sb.append(t[j].toString());
@@ -141,14 +141,15 @@ public class ClaviusHighlighter extends Highlighter {
                         }
                     }
                     a.setRightContext(sb.toString());
-                    
+
                     a.setConcept("");
                     a.setType("");
-                    a.setIdNeo4j(-1l);
                     a.setPageNum(-1l);
+                    // a.setIdNeo4j(Long.parseLong(document.get("idNeo4j")));
+                    a.setIdNeo4j(Long.parseLong(document.get("idDoc")));
                     a.setResourceObject("");
                     a.setId(-1l);
-                    
+
                     ret.add(a);
                 }
             }

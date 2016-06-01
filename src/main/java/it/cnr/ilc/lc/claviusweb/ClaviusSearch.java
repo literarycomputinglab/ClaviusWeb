@@ -317,7 +317,7 @@ public class ClaviusSearch extends HttpServlet {
                 //String text = doc.get("content");
                 TokenStream tokenStream = TokenSources.getAnyTokenStream(searcher.getIndexReader(), id, "content", fullTextAnalyzer);
 
-                List<Annotation> frag = highlighter.getBestTextClaviusFragments(tokenStream, idDoc, false, 10);//highlighter.getBestFragments(tokenStream, text, 3, "...");
+                List<Annotation> frag = highlighter.getBestTextClaviusFragments(tokenStream, doc, false, 10);//highlighter.getBestFragments(tokenStream, text, 3, "...");
                 for (int j = 0; j < frag.size(); j++) {
                     log.debug("idDoc: " + idDoc + ", Annotation[" + j + "] " + frag.get(j).toString());
                 }

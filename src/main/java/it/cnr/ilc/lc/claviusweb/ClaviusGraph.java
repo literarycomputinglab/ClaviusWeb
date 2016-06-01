@@ -293,6 +293,7 @@ public class ClaviusGraph extends HttpServlet {
                             log.debug("createEntity: idDoc: " + a.getIdDoc());
 
                             a.setType("NOT_TYPED");
+                            
                             //SEARCH FIRST IN CLAVIUS LEXICON AND THEN IN WIKIDATA (IF NO RESULTS FROM CLAVIUS LEXICON)
                             log.debug("createEntity: is " + triple.object + "  contained in map? " + conceptsMap.containsKey(triple.object));
                             if (conceptsMap.containsKey(triple.object)) {
