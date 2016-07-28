@@ -39,7 +39,7 @@ public class User implements Serializable {
 
     //@OneToMany(cascade = CascadeType.ALL)
     @ElementCollection
-    @CollectionTable(name = "resources", joinColumns = @JoinColumn(name = "accountID"))
+    @CollectionTable(name = "resources", joinColumns = @JoinColumn(name = "userID"))
     @Column(name = "resource")
     private List<Integer> resources;
 
@@ -99,7 +99,7 @@ public class User implements Serializable {
 
     @Override
     public String toString() {
-        return (String.format("User=(%s) : [%s - %s] [%d], Resources:", this.username, this.email, this.password, this.accountID)).concat(this.resources.toString());
+        return (String.format("User=(%s) : [%s - %s] [%d], Resources:", (this.username != null) ? this.username : "", (this.email != null) ? this.email : "", (this.password != null) ? this.password : "", (this.accountID != null) ? this.accountID : Long.MIN_VALUE)).concat((this.resources != null) ? this.resources.toString() : "");
 
     }
 

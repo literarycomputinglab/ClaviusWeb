@@ -6,23 +6,14 @@
 package it.cnr.ilc.lc.claviusweb;
 
 import com.google.gson.Gson;
-import com.google.gson.JsonElement;
-import it.cnr.ilc.lc.claviusweb.entity.Annotation;
-import it.cnr.ilc.lc.claviusweb.entity.Concept;
+import com.google.gson.JsonSyntaxException;
 import it.cnr.ilc.lc.claviusweb.entity.User;
-import it.cnr.ilc.lc.claviusweb.fulltextsearch.ClaviusHighlighter;
-import it.cnr.ilc.lc.claviusweb.listener.PersistenceListener;
+import it.cnr.ilc.lc.claviusweb.listener.AccountPersistenceListener;
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import javax.persistence.EntityManager;
-import javax.persistence.EntityManagerFactory;
 import javax.persistence.EntityTransaction;
-import javax.persistence.Persistence;
-import javax.persistence.RollbackException;
 import javax.persistence.TypedQuery;
 import javax.persistence.criteria.CriteriaBuilder;
 import javax.persistence.criteria.CriteriaQuery;
@@ -37,27 +28,6 @@ import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.apache.lucene.analysis.Analyzer;
-import org.apache.lucene.analysis.TokenStream;
-import org.apache.lucene.analysis.custom.CustomAnalyzer;
-import org.apache.lucene.document.Document;
-import org.apache.lucene.index.DirectoryReader;
-import org.apache.lucene.index.Term;
-import org.apache.lucene.queryparser.classic.ParseException;
-import org.apache.lucene.queryparser.classic.QueryParser;
-import org.apache.lucene.search.IndexSearcher;
-import org.apache.lucene.search.Query;
-import org.apache.lucene.search.TopDocs;
-import org.apache.lucene.search.WildcardQuery;
-import org.apache.lucene.search.highlight.InvalidTokenOffsetsException;
-import org.apache.lucene.search.highlight.QueryScorer;
-import org.apache.lucene.search.highlight.SimpleFragmenter;
-import org.apache.lucene.search.highlight.SimpleHTMLFormatter;
-import org.apache.lucene.search.highlight.TokenSources;
-import org.apache.lucene.store.Directory;
-import org.apache.lucene.store.FSDirectory;
-import org.hibernate.search.jpa.FullTextEntityManager;
-import org.hibernate.search.jpa.FullTextQuery;
 
 /**
  *
@@ -69,6 +39,8 @@ import org.hibernate.search.jpa.FullTextQuery;
 public class ClaviusAccount extends HttpServlet {
 
     private static Logger log = LogManager.getLogger(ClaviusAccount.class);
+    private static final Long INVALID_ACCOUNTID_VALUES = -1l;
+    private static final String INVALID_USER_INFO = "FALSE";
 
     @Override
     public void init(ServletConfig config) throws ServletException {
@@ -96,7 +68,7 @@ public class ClaviusAccount extends HttpServlet {
         response.setHeader("Access-Control-Allow-Origin", "*");
 
 //        String ip = getClientIpAddr(request);
-        Gson gson = new Gson();
+//        Gson gson = new Gson();
         String command = request.getPathInfo().substring(1);
         String json = readPost(request);
 
@@ -105,26 +77,45 @@ public class ClaviusAccount extends HttpServlet {
          * http://url-di-claviusweb/ClaviusAccount/login
          */
         if ("login".equals(command)) {
-            User u = new Gson().fromJson(json, User.class);
-            String username = u.getUsername();
-            String password = u.getPassword();
-            Long accountId = retrieve(username, password);
-            log.info(accountId);
-            if (accountId != null && accountId != -1) {
-                HttpSession session = request.getSession(true);
-                session.setAttribute("accountId", accountId);
-                u.setAccountID(accountId);
+            User u = null;
+            // there is no control on a multiple login action
+
+            try {
+                u = new Gson().fromJson(json, User.class);
+            } catch (JsonSyntaxException e) {
+                log.info("login: malformed json", e);
+
+            }
+
+            if (null != u && null != u.getUsername() && null != u.getPassword()) {
+
+                String username = u.getUsername();
+                String password = u.getPassword();
+                Long accountId = retrieve(username, password); // mettere una try catch??
+                log.info(accountId);
+                if (accountId != null && !accountId.equals(INVALID_ACCOUNTID_VALUES)) {
+                    HttpSession session = request.getSession(true);
+                    session.setAttribute("accountId", accountId);
+                    u.setAccountID(accountId);
+                } else {
+                    if (null != request.getSession(false)) {
+                        request.getSession().invalidate();
+                    }
+                    u.setAccountID(INVALID_ACCOUNTID_VALUES);
+                }
+
             } else {
-                u.setAccountID(Long.valueOf(-1));
+                log.warn("the user object has problem in its own instance: " + u.toString());
+                nobodyloggedin(u);
             }
 
             response.getWriter().append(new Gson().toJson(u));
-
-        } /**
-         * Comando di loout: il client invoca la procedura con il path
+        }/**
+         * Comando di logout: il client invoca la procedura con il path
          * http://url-di-claviusweb/ClaviusAccount/logout
          */
         else if ("logout".equals(command)) {
+            User u = new User();
             HttpSession session = request.getSession(false);
             if (session == null) {
                 // errore ci chiedono logout ma la sessione non esiste
@@ -132,6 +123,10 @@ public class ClaviusAccount extends HttpServlet {
                 session.invalidate();
                 log.info("session invalidated");
             }
+
+            nobodyloggedin(u);
+
+            response.getWriter().append(new Gson().toJson(u));
 
         } /**
          * Comando di verifica login: il client invoca la procedura con il path
@@ -145,7 +140,7 @@ public class ClaviusAccount extends HttpServlet {
 
             } else {
                 Long accountId = (Long) session.getAttribute("accountId");
-                if (accountId == null || accountId == -1) {
+                if (accountId == null || accountId.equals(INVALID_ACCOUNTID_VALUES)) {
                     nobodyloggedin(u);
                 } else {
                     u = retrieveUserByAccountID(accountId);
@@ -159,7 +154,15 @@ public class ClaviusAccount extends HttpServlet {
          * path http://url-di-claviusweb/ClaviusAccount/createuser
          */
         else if ("createuser".equals(command)) {
-            Long uid = createUserAccount(json);
+            User u = null;
+            try {
+                u = new Gson().fromJson(json, User.class);
+
+            } catch (JsonSyntaxException je) {
+                log.info("malformed json in create user account", je);
+            }
+
+            Long uid = createUserAccount(u);
             response.getWriter().append(new Gson().toJson(uid));
         }
     }
@@ -182,105 +185,200 @@ public class ClaviusAccount extends HttpServlet {
      * @return the AccountID of the specified user or -1 if no user has found
      */
     private Long retrieve(String username, String password) {
-        //  return Long.MIN_VALUE;
-        EntityManagerFactory entityManagerFactory = Persistence.createEntityManagerFactory("clavius-account");
-        EntityManager entityManager = entityManagerFactory.createEntityManager();
-        // Interroga il DB chiedendo l'accountID dell'utente con la password indicata
-        // se non esiste nessun utente con tali credenziali ritorna -1
+        Long ret = INVALID_ACCOUNTID_VALUES;
+        EntityManager entityManager = null;
+        try {
+            entityManager = AccountPersistenceListener.getEntityManager();
+        } catch (Exception e) {
+            log.warn("unable to create an Account Entity Manager", e);
 
-        entityManager.getTransaction().begin();
-        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
-        CriteriaQuery<User> cq = cb.createQuery(User.class);
-        Root<User> pet = cq.from(User.class);
-
-        Predicate p1 = cb.equal(pet.get("username"), username);
-        Predicate p2 = cb.equal(pet.get("password"), password);
-        cq.where(p1, p2);
-
-        TypedQuery<User> q = entityManager.createQuery(cq);
-        List<User> results = q.getResultList();
-        entityManager.getTransaction().commit();
-
-        entityManager.close();
-        entityManagerFactory.close();
-
-        log.info(results);
-        if (results.size() > 0) {
-            return results.get(0).getAccountID();
-        } else {
-            return Long.valueOf(-1);
         }
 
-    }
+        if (null != entityManager) {
+            log.info("created an Account Entity Manager");
 
-    private Long createUserAccount(String json) {
-        Long ret = Long.valueOf(-1);
+            try {
 
-        Gson gson = new Gson();
-        User u = gson.fromJson(json, User.class);
-        u.setAccountID((fingerPrint(u)));
+                entityManager.getTransaction().begin();
+                CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+                CriteriaQuery<User> cq = cb.createQuery(User.class
+                );
+                Root<User> user = cq.from(User.class);
 
-        save(u);
-        log.info(u.toString());
+                Predicate p1 = cb.equal(user.get("username"), username);
+                Predicate p2 = cb.equal(user.get("password"), password);
 
-        ret = u.getAccountID();
+                cq.where(p1, p2);
+
+                TypedQuery<User> q = entityManager.createQuery(cq);
+                List<User> results = q.getResultList();
+
+                entityManager.getTransaction()
+                        .commit();
+
+                log.info(results);
+
+                if (results.size()
+                        > 0) {
+                    ret = results.get(0).getAccountID();
+                }
+            } catch (Exception e) {
+                log.error("error in retrieving user account", e);
+                ret = INVALID_ACCOUNTID_VALUES;
+            }
+        }
+
+        try {
+            if (null != entityManager) {
+                entityManager.close();
+            }
+        } catch (Exception e) {
+            log.error("error while cosing entitymanager", e);
+        }
         return ret;
     }
 
-    private void save(User u) {
-        //throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-        EntityManagerFactory entityManagerFactory = Persistence.createEntityManagerFactory("clavius-account");
-        EntityManager entityManager = entityManagerFactory.createEntityManager();
-        EntityTransaction transaction = entityManager.getTransaction();
+    private Long createUserAccount(User u) {
 
-        transaction.begin();
-        entityManager.persist(u);
-        transaction.commit();
+        Long ret = INVALID_ACCOUNTID_VALUES;
 
-        entityManager.close();
-        entityManagerFactory.close();
+        if (null != u) {
 
+            u.setAccountID(
+                    (fingerPrint(u)));
+
+            try {
+                save(u);
+            } catch (Exception e) {
+                log.error("error in creating user account", e);
+            }
+
+            log.info(u.toString());
+
+            ret = u.getAccountID();
+        }
+        return ret;
+    }
+
+    private void save(User u) throws Exception {
+
+        EntityManager entityManager = null;
+        try {
+            entityManager = AccountPersistenceListener.getEntityManager();
+        } catch (Exception e) {
+            log.info("unable to create Account Entity Manager", e);
+            throw new Exception("unable to create Account Entity Manager");
+        }
+
+        if (null == entityManager) {
+            log.info("unable to create Account Entity Manager");
+            throw new Exception("unable to create Account Entity Manager");
+        }
+
+        try {
+            EntityTransaction transaction = entityManager.getTransaction();
+
+            transaction.begin();
+            entityManager.persist(u);
+            transaction.commit();
+
+            entityManager.close();
+        } catch (Exception e) {
+            log.error("error in persisting the user account", e);
+            throw e;
+        } finally {
+            try {
+                if (null != entityManager && entityManager.isOpen()) {
+                    entityManager.close();
+                }
+            } catch (Exception e) {
+                log.error("error while closing entity manager");
+            }
+        }
     }
 
     private Long fingerPrint(User u) {
-        //throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-
         return (Long.valueOf((((u.getUsername().length() + u.getPassword().length()) % 50) + 255) % 64) + u.hashCode());
     }
 
     private void nobodyloggedin(User u) {
-        String invalid = "-1";
-        // nessuno p loggato
-        u.setAccountID(Long.valueOf(-1));
-        u.setEmail(invalid);
-        u.setPassword(invalid);
+        // nessuno è loggato
+
+        if (null == u) {
+            u = new User();
+        }
+
+        u.setAccountID(INVALID_ACCOUNTID_VALUES);
+        u.setEmail(INVALID_USER_INFO);
+        u.setPassword(INVALID_USER_INFO);
         u.setResourses(null);
-        u.setUsername(invalid);
+        u.setUsername(INVALID_USER_INFO);
     }
 
     private User retrieveUserByAccountID(Long accountId) {
         User u = new User();
-        //u.setAccountID(accountId);
-        EntityManagerFactory entityManagerFactory = Persistence.createEntityManagerFactory("clavius-account");
-        EntityManager entityManager = entityManagerFactory.createEntityManager();
-        // Interroga il DB chiedendo l'accountID dell'utente con la password indicata
-        // se non esiste nessun utente con tali credenziali ritorna -1
-        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
-        CriteriaQuery<User> cq = cb.createQuery(User.class);
-        Root<User> pet = cq.from(User.class);
+        EntityManager entityManager = null;
 
-        Predicate p1 = cb.equal(pet.get("accountID"), accountId);
+        try {
 
-        cq.where(p1);
+            entityManager = AccountPersistenceListener.getEntityManager();
 
-        TypedQuery<User> q = entityManager.createQuery(cq);
-        List<User> results = q.getResultList();
+        } catch (Exception e) {
 
-        log.info(results);
-        if (results.size() > 0) {
-            u = results.get(0);
-        } else {
+            log.warn("unable to create account entity manager", e);
             nobodyloggedin(u);
+        }
+
+        if (null != entityManager) {
+            log.warn("created account entity manager");
+
+            try {
+                entityManager.getTransaction().begin();
+                log.info(entityManager.toString());
+                CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+                CriteriaQuery<User> cq = cb.createQuery(User.class
+                );
+                Root<User> user = cq.from(User.class);
+
+                Predicate p1 = cb.equal(user.get("accountID"), accountId);
+
+                cq.where(p1);
+
+                TypedQuery<User> q = entityManager.createQuery(cq);
+                List<User> results = q.getResultList();
+//        log.info(Thread.currentThread());
+//        try {
+//            Thread.sleep(30000);
+//        } catch (InterruptedException ie) {
+//            log.info("", ie);
+//        }
+
+                entityManager.getTransaction()
+                        .commit();
+
+                log.info(results);
+
+                if (results.size()
+                        > 0) {
+                    u = results.get(0);
+                } else {
+                    nobodyloggedin(u);
+
+                }
+            } catch (Exception e) {
+
+                log.error("errori while retrieving user from DB", e);
+                nobodyloggedin(u);
+
+            }
+        }
+
+        try {
+            if (null != entityManager) {
+                entityManager.close();
+            }
+        } catch (Exception e) {
+            log.error("error while closing the entity manager");
 
         }
         return u;
