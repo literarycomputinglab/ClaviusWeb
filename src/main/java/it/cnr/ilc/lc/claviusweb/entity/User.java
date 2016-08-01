@@ -99,7 +99,11 @@ public class User implements Serializable {
 
     @Override
     public String toString() {
-        return (String.format("User=(%s) : [%s - %s] [%d], Resources:", (this.username != null) ? this.username : "", (this.email != null) ? this.email : "", (this.password != null) ? this.password : "", (this.accountID != null) ? this.accountID : Long.MIN_VALUE)).concat((this.resources != null) ? this.resources.toString() : "");
+        return (String.format("User=(%s) : [%s - %s] [%d], Resources:", 
+                (this.username != null) ? this.username : "", 
+                (this.email != null) ? this.email : "", 
+                (this.password != null) ? this.password : "", 
+                (this.accountID != null) ? this.accountID : Long.MIN_VALUE)).concat((this.resources != null) ? this.resources.toString() : "[]");
 
     }
 

@@ -6,6 +6,9 @@
 package it.cnr.ilc.lc.claviusweb;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.google.gson.JsonSyntaxException;
 import it.cnr.ilc.lc.claviusweb.entity.User;
 import it.cnr.ilc.lc.claviusweb.listener.AccountPersistenceListener;
@@ -28,6 +31,9 @@ import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import java.lang.reflect.Type;
+import com.google.gson.reflect.TypeToken;
+import java.util.ArrayList;
 
 /**
  *
@@ -119,6 +125,7 @@ public class ClaviusAccount extends HttpServlet {
             HttpSession session = request.getSession(false);
             if (session == null) {
                 // errore ci chiedono logout ma la sessione non esiste
+                log.info("session already closed where loguout is requested");
             } else {
                 session.invalidate();
                 log.info("session invalidated");
@@ -136,11 +143,14 @@ public class ClaviusAccount extends HttpServlet {
             User u = new User();
             HttpSession session = request.getSession(false);
             if (session == null) {
+                log.warn("Session doedn't exist!!!");
+
                 nobodyloggedin(u);
 
             } else {
                 Long accountId = (Long) session.getAttribute("accountId");
                 if (accountId == null || accountId.equals(INVALID_ACCOUNTID_VALUES)) {
+                    log.warn("Session is valid but nobody is logged in!!!");
                     nobodyloggedin(u);
                 } else {
                     u = retrieveUserByAccountID(accountId);
@@ -153,7 +163,7 @@ public class ClaviusAccount extends HttpServlet {
          * Comando di creazione utenti: il client invoca la procedura con il
          * path http://url-di-claviusweb/ClaviusAccount/createuser
          */
-        else if ("createuser".equals(command)) {
+        else if ("createUser".equals(command)) {
             User u = null;
             try {
                 u = new Gson().fromJson(json, User.class);
@@ -164,6 +174,11 @@ public class ClaviusAccount extends HttpServlet {
 
             Long uid = createUserAccount(u);
             response.getWriter().append(new Gson().toJson(uid));
+        } else {
+            User u = null;
+            log.error("Command (" + command + ") is not valid");
+            nobodyloggedin(u);
+            response.getWriter().append(new Gson().toJson(u));
         }
     }
 
@@ -201,8 +216,7 @@ public class ClaviusAccount extends HttpServlet {
 
                 entityManager.getTransaction().begin();
                 CriteriaBuilder cb = entityManager.getCriteriaBuilder();
-                CriteriaQuery<User> cq = cb.createQuery(User.class
-                );
+                CriteriaQuery<User> cq = cb.createQuery(User.class);
                 Root<User> user = cq.from(User.class);
 
                 Predicate p1 = cb.equal(user.get("username"), username);
@@ -213,13 +227,11 @@ public class ClaviusAccount extends HttpServlet {
                 TypedQuery<User> q = entityManager.createQuery(cq);
                 List<User> results = q.getResultList();
 
-                entityManager.getTransaction()
-                        .commit();
+                entityManager.getTransaction().commit();
 
                 log.info(results);
 
-                if (results.size()
-                        > 0) {
+                if (results.size() > 0) {
                     ret = results.get(0).getAccountID();
                 }
             } catch (Exception e) {
