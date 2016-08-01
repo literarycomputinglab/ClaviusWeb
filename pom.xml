@@ -4,7 +4,7 @@
 
     <groupId>it.cnr.ilc.lc</groupId>
     <artifactId>ClaviusWeb</artifactId>
-    <version>1.0.3</version>
+    <version>1.0.4</version>
     <packaging>war</packaging>
 
     <name>ClaviusWeb</name>
