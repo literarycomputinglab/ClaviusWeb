@@ -6,6 +6,7 @@
     <artifactId>ClaviusWeb</artifactId>
     <version>1.0.4</version>
     <packaging>war</packaging>
+    
     <name>ClaviusWeb</name>
 
     <properties>
