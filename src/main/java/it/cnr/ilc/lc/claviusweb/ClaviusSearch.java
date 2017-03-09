@@ -53,7 +53,7 @@ import org.hibernate.search.jpa.FullTextQuery;
  * @author simone
  * @author angelo
  */
-@WebServlet(name = "ClaviusSearch", urlPatterns = {"/ClaviusSearch/*"})
+@WebServlet( name = "ClaviusSearch", urlPatterns = {"/ClaviusSearch/*"})
 public class ClaviusSearch extends HttpServlet {
 
     private static Logger log = LogManager.getLogger(ClaviusSearch.class);
@@ -140,8 +140,7 @@ public class ClaviusSearch extends HttpServlet {
 
             response.getWriter().append(annotationToJson(loa));
             log.info("Response sent to " + ip + " for query " + cq.luceneQuery);
-        }
-        else if ("count".equals(command)) {
+        } else if ("count".equals(command)) {
             log.info("[" + ip + "] COUNT " + trimTo(json, stringLogLenght));
             List<Concept> cs = Arrays.asList(new Gson().fromJson(json, Concept[].class));
 
@@ -249,12 +248,12 @@ public class ClaviusSearch extends HttpServlet {
         return result;
     }
 
-    private void searchForHits(List<Concept> loc)  {
+    private void searchForHits(List<Concept> loc) {
 
-        for ( Concept c : loc ) {
+        for (Concept c : loc) {
             c.count = countSearch(c.uri);
         }
-        
+
     }
 
     private static int countSearch(String term) { // replicare il codice della searchConcept
@@ -262,7 +261,7 @@ public class ClaviusSearch extends HttpServlet {
         int count = 0;
         try {
             Directory indexDirectory
-                    = FSDirectory.open(Paths.get("/var/lucene/clavius-1.0.3/indexes/it.cnr.ilc.lc.claviusweb.entity.Annotation"));
+                    = FSDirectory.open(Paths.get("/var/lucene/clavius-1.0.5/indexes/it.cnr.ilc.lc.claviusweb.entity.Annotation"));
             DirectoryReader ireader = DirectoryReader.open(indexDirectory);
 
             IndexSearcher searcher = new IndexSearcher(ireader);
@@ -271,7 +270,7 @@ public class ClaviusSearch extends HttpServlet {
             TopDocs hits = searcher.search(query, Integer.MAX_VALUE);
             count = hits.totalHits;
             log.info("Found " + count + " occurrence(s) of " + term);
-            
+
         } catch (IOException e) {
             log.error(e);
         }
@@ -287,7 +286,7 @@ public class ClaviusSearch extends HttpServlet {
 
         try {
             Directory indexDirectory
-                    = FSDirectory.open(Paths.get("/var/lucene/clavius-1.0.3/indexes/it.cnr.ilc.lc.claviusweb.entity.PlainText"));
+                    = FSDirectory.open(Paths.get("/var/lucene/clavius-1.0.5/indexes/it.cnr.ilc.lc.claviusweb.entity.PlainText"));
             DirectoryReader ireader = DirectoryReader.open(indexDirectory);
 
             IndexSearcher searcher = new IndexSearcher(ireader);

@@ -39,7 +39,7 @@ public class TEADocument {
 
         @Override
         public String toString() {
-            return "Triple: " + " start: " + start + " end: " + end + " object: " + object;
+            return "Triple: start=(" + start + ") end=(" + end + ") predicate=(" + predicate + ") object=(" + object + ")";
         }
 
     }

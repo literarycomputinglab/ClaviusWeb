@@ -4,7 +4,7 @@
 
     <groupId>it.cnr.ilc.lc</groupId>
     <artifactId>ClaviusWeb</artifactId>
-    <version>1.0.4</version>
+    <version>1.0.5</version>
     <packaging>war</packaging>
     
     <name>ClaviusWeb</name>
@@ -44,7 +44,7 @@
         <dependency>
             <groupId>org.neo4j</groupId>
             <artifactId>neo4j</artifactId>
-            <version>2.3.2</version>
+            <version>2.3.9</version>
         </dependency>
         <dependency>
             <groupId>org.neo4j</groupId>

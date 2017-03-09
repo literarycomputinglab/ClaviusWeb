@@ -17,6 +17,8 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import javax.servlet.ServletContext;
+import javax.servlet.ServletRegistration;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -34,8 +36,18 @@ public class ClaviusRedisClient {
 
     Set<StatefulRedisPubSubConnection<String, String>> s = Collections.synchronizedSet(new HashSet<>());
 
+    private ServletContext context = null;
+
     public ClaviusRedisClient() {
         init();
+    }
+
+    public ServletContext getContext() {
+        return context;
+    }
+
+    public void setContext(ServletContext context) {
+        this.context = context;
     }
 
     private void init() {
@@ -47,7 +59,7 @@ public class ClaviusRedisClient {
         s.add(redisClient.connectPubSub());
 
         synchronized (s) {
-            
+
             Iterator<StatefulRedisPubSubConnection<String, String>> i = s.iterator(); // Must be in the synchronized block
             connection = i.next();
         }
@@ -60,7 +72,11 @@ public class ClaviusRedisClient {
             public void message(String channel, String message) {
                 log.debug("channel=(" + channel + "), message=(" + message + ")");
                 executor.submit(() -> {
-                    System.err.println(String.format(Thread.currentThread().getName() + " Channel: %s, Message: %s", channel, message));
+                    log.info(String.format(Thread.currentThread().getName() + " Channel: %s, Message: %s", channel, message));
+
+                    ClaviusGraph cg = (ClaviusGraph) ClaviusRedisClient.this.getContext().getAttribute("ClaviusGraph");
+                    log.info("ClaviusGraph Servlet identity: " + cg);
+                    cg.updateNode(message);
                 });
             }
 

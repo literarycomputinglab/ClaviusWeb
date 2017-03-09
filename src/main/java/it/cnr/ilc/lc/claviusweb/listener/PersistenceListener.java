@@ -30,10 +30,10 @@ public class PersistenceListener implements ServletContextListener {
         log.info("entityManagerFactory is null? " + (null == entityManagerFactory));
         
         if (null == entityManagerFactory) {
-            entityManagerFactory = Persistence.createEntityManagerFactory("clavius-1.0.3");
+            entityManagerFactory = Persistence.createEntityManagerFactory("clavius-1.0.5");
             log.info("entityManagerFactory is now open? " + entityManagerFactory.isOpen());
         } else if (!entityManagerFactory.isOpen()) {
-            entityManagerFactory = Persistence.createEntityManagerFactory("clavius-1.0.3");
+            entityManagerFactory = Persistence.createEntityManagerFactory("clavius-1.0.5");
         }
         return entityManagerFactory.createEntityManager();
 

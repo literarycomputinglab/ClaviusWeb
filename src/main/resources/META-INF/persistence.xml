@@ -1,22 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <persistence version="2.1" xmlns="http://xmlns.jcp.org/xml/ns/persistence" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://xmlns.jcp.org/xml/ns/persistence http://xmlns.jcp.org/xml/ns/persistence/persistence_2_1.xsd">
-    <persistence-unit name="clavius-1.0.3" transaction-type="RESOURCE_LOCAL">
+    <persistence-unit name="clavius-1.0.5" transaction-type="RESOURCE_LOCAL">
     
         <provider>org.hibernate.ejb.HibernatePersistence</provider>
     
         <!--        <class>it.cnr.ilc.lc.clavius.search.entity.Annotation</class> -->
     
         <properties>
-            <property name="javax.persistence.jdbc.url" value="jdbc:mysql://localhost:3306/claviusSearch_1_0_3?useSSL=false"/>
+            <property name="javax.persistence.jdbc.url" value="jdbc:mysql://localhost:3306/claviusSearch_1_0_5?useSSL=false"/>
             <property name="javax.persistence.jdbc.driver" value="com.mysql.jdbc.Driver"/>
             <property name="javax.persistence.jdbc.user" value="clavius"/>
             <property name="javax.persistence.jdbc.password" value="claviusproject"/> 
             <property name="hibernate.cache.provider_class" value="org.hibernate.cache.NoCacheProvider"/>
-            <property name="javax.persistence.schema-generation.database.action" value="create"/>
+            <property name="javax.persistence.schema-generation.database.action" value="none"/>
             <property name="show_sql" value="true" />
             <property name="hbm2ddl.auto" value="update" /> 
             <property name="hibernate.search.default.directory_provider" value="filesystem" />
-            <property name="hibernate.search.default.indexBase" value="/var/lucene/clavius-1.0.3/indexes" />      
+            <property name="hibernate.search.default.indexBase" value="/var/lucene/clavius-1.0.5/indexes" />      
             <property name="hibernate.search.default.indexwriter.infostream" value="true" />
             <property name="hibernate.connection.provider_class" value="org.hibernate.connection.C3P0ConnectionProvider" />
             <property name="hibernate.c3p0.min_size" value="5" />
@@ -51,7 +51,7 @@
             <property name="show_sql" value="true" />
             <property name="hbm2ddl.auto" value="update" /> 
             <property name="hibernate.search.default.directory_provider" value="filesystem" />
-            <property name="hibernate.search.default.indexBase" value="/var/lucene/clavius-1.0.3/indexes" />      
+            <property name="hibernate.search.default.indexBase" value="/var/lucene/clavius-1.0.5/indexes" />      
             <property name="hibernate.search.default.indexwriter.infostream" value="true" />
             <property name="hibernate.connection.provider_class" value="org.hibernate.connection.C3P0ConnectionProvider" />
             <property name="hibernate.c3p0.min_size" value="5" />

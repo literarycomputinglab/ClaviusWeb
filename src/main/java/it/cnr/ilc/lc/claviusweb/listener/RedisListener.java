@@ -6,6 +6,7 @@
 package it.cnr.ilc.lc.claviusweb.listener;
 
 import it.cnr.ilc.lc.claviusweb.ClaviusRedisClient;
+import javax.servlet.ServletContext;
 import javax.servlet.ServletContextEvent;
 import javax.servlet.ServletContextListener;
 import javax.servlet.annotation.WebListener;
@@ -26,7 +27,8 @@ public class RedisListener implements ServletContextListener {
     public void contextInitialized(ServletContextEvent sce) {
         log.info("RedisListener initialized");
         crc = new ClaviusRedisClient();
-
+        ServletContext context = sce.getServletContext();
+        crc.setContext(context);
     }
 
     @Override

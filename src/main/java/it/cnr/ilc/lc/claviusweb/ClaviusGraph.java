@@ -1,6 +1,7 @@
 package it.cnr.ilc.lc.claviusweb;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonSyntaxException;
 import it.cnr.ilc.lc.claviusweb.entity.Annotation;
 import it.cnr.ilc.lc.claviusweb.entity.PlainText;
 import it.cnr.ilc.lc.claviusweb.entity.TEADocument;
@@ -40,7 +41,7 @@ import org.neo4j.rest.graphdb.RestGraphDatabase;
  * @author simone
  * @author angelo
  */
-@WebServlet(name = "ClaviusGraph", urlPatterns = {"/ClaviusGraph/*"})
+@WebServlet(loadOnStartup = 1, name = "ClaviusGraph", urlPatterns = {"/ClaviusGraph/*"})
 public class ClaviusGraph extends HttpServlet {
 
     private static GraphDatabaseService db;
@@ -56,6 +57,10 @@ public class ClaviusGraph extends HttpServlet {
     public void init(ServletConfig config) throws ServletException {
 
         EntityManager entityManager = null;
+
+        config.getServletContext().setAttribute("ClaviusGraph", this);
+        log.info("ClaviusGraph Servlet identity: " + this);
+
         readProperies();
 
         if (db == null) {
@@ -130,22 +135,41 @@ public class ClaviusGraph extends HttpServlet {
         String json = readPost(request);
         if ("create".equals(command)) {
             log.info("[" + ip + "] create " + trimTo(json, stringLogLenght));
-            response.getWriter().append(gson.toJson(createNode(gson.fromJson(json, TEADocument.class))));
+            response.getWriter().append(gson.toJson(_createNode(gson.fromJson(json, TEADocument.class))));
         } else if ("update".equals(command)) {
             log.info("[" + ip + "] update " + trimTo(json, stringLogLenght));
-            response.getWriter().append(gson.toJson(updateNode(gson.fromJson(json, TEADocument.class))));
+            response.getWriter().append(gson.toJson(_updateNode(gson.fromJson(json, TEADocument.class))));
         } else if ("load".equals(command)) {
             log.info("[" + ip + "] load " + trimTo(json, stringLogLenght));
-            response.getWriter().append(gson.toJson(loadNode(gson.fromJson(json, TEADocument.class))));
+            response.getWriter().append(gson.toJson(_loadNode(gson.fromJson(json, TEADocument.class))));
         } else if ("list".equals(command)) {
             log.info("[" + ip + "] list");
-            response.getWriter().append(gson.toJson(listNodes()));
+            response.getWriter().append(gson.toJson(_listNodes()));
         } else {
             log.error("Unvalid path URI for command " + command + "::" + json + "from ip: " + ip);
             throw new UnsupportedOperationException("Unvalid path URI for command " + command + "::" + json);
         }
         log.info("Response sent to " + ip + " for command (" + command + ")");
 
+    }
+
+    public Boolean updateNode(String jsonDocument) {
+
+        log.info("ClaviusGraph ID: " + this);
+
+        log.info("Update request: document=(" + jsonDocument.substring(0, (jsonDocument.length() < 20 ? jsonDocument.length() : 20)) + " ...)");
+        Boolean ret = false;
+        try {
+            Gson gson = new Gson();
+            if (null != _updateNode(gson.fromJson(jsonDocument, TEADocument.class))) {
+                ret = true;
+            }
+        } catch (JsonSyntaxException e) {
+            log.error(e);
+        }
+        log.info("Update response: " + ret);
+
+        return ret;
     }
 
     private String readPost(HttpServletRequest request) throws IOException {
@@ -159,10 +183,10 @@ public class ClaviusGraph extends HttpServlet {
         }
     }
 
-    private TEADocument createNode(TEADocument document) {
+    private TEADocument _createNode(TEADocument document) {
         synchronized (db) {
             try (Transaction tx = db.beginTx()) {
-                Node node = db.createNode(() -> "Clavius_1_0_3");
+                Node node = db.createNode(() -> "Clavius_1_0_5");
                 node.setProperty("name", document.name);
                 node.setProperty("code", document.code);
                 node.setProperty("graph", document.graph);
@@ -174,33 +198,43 @@ public class ClaviusGraph extends HttpServlet {
         }
     }
 
-    private TEADocument updateNode(TEADocument document) {
+    private TEADocument _updateNode(TEADocument document) {
         long endTime;
         long midTime;
-        synchronized (db) {
-            long startTime = System.currentTimeMillis();
-            try (Transaction tx = db.beginTx()) {
-                Node node = db.getNodeById(document.id);
-                node.setProperty("name", document.name);
-                node.setProperty("code", document.code);
-                node.setProperty("graph", document.graph);
-                node.setProperty("idDoc", document.idDoc);
+        if (null != document) {
+            synchronized (db) {
+                log.info("Neo4j lock acquired");
 
-                midTime = System.currentTimeMillis();
-                log.info("After neo4j load and set  " + (midTime - startTime) + " ms");
+                long startTime = System.currentTimeMillis();
+                try (Transaction tx = db.beginTx()) {
+                    Node node = db.getNodeById(document.id);
+                    if (null == node) {
+                        log.warn("Document not found for id=(" + document.id + ")");
+                    }
+                    node.setProperty("name", document.name);
+                    node.setProperty("code", document.code);
+                    node.setProperty("graph", document.graph);
+                    node.setProperty("idDoc", document.idDoc);
 
-                //salvataggio delle annotazioni
-                updateLuceneIndex(document);
-                endTime = System.currentTimeMillis();
-                log.info("Insert in index " + (endTime - midTime) + " ms");
-                tx.success();
+                    midTime = System.currentTimeMillis();
+                    log.info("After neo4j load and set  " + (midTime - startTime) + " ms");
+
+                    //salvataggio delle annotazioni
+                    updateLuceneIndex(document);
+                    endTime = System.currentTimeMillis();
+                    log.info("Insert in index " + (endTime - midTime) + " ms");
+                    tx.success();
+
+                }
+                log.info("Neo4j unlocked");
             }
-            return document;
+        } else {
+            log.warn("Document is null!!!");
         }
-
+        return document;
     }
 
-    private TEADocument loadNode(TEADocument document) {
+    private TEADocument _loadNode(TEADocument document) {
         synchronized (db) {
             try (Transaction tx = db.beginTx()) {
                 Node node = db.getNodeById(document.id);
@@ -214,11 +248,11 @@ public class ClaviusGraph extends HttpServlet {
         }
     }
 
-    private List<TEADocument> listNodes() {
+    private List<TEADocument> _listNodes() {
         synchronized (db) {
             try (Transaction tx = db.beginTx()) {
                 List<TEADocument> documents = new ArrayList<>();
-                for (Node node : db.findNodesByLabelAndProperty(() -> "Clavius_1_0_3", null, null)) {
+                for (Node node : db.findNodesByLabelAndProperty(() -> "Clavius_1_0_5", null, null)) {
                     TEADocument document = new TEADocument();
                     document.id = node.getId();
                     document.name = (String) node.getProperty("name", "");
@@ -293,7 +327,7 @@ public class ClaviusGraph extends HttpServlet {
                             log.debug("createEntity: idDoc: " + a.getIdDoc());
 
                             a.setType("NOT_TYPED");
-                            
+
                             //SEARCH FIRST IN CLAVIUS LEXICON AND THEN IN WIKIDATA (IF NO RESULTS FROM CLAVIUS LEXICON)
                             log.debug("createEntity: is " + triple.object + "  contained in map? " + conceptsMap.containsKey(triple.object));
                             if (conceptsMap.containsKey(triple.object)) {
@@ -489,11 +523,13 @@ public class ClaviusGraph extends HttpServlet {
             // synchronized (entityManager) {
             entityManager.getTransaction().begin();
             fullTextEntityManager = org.hibernate.search.jpa.Search.getFullTextEntityManager(entityManager);
+
             try {
 
                 QueryParser parser = new QueryParser(
                         "resourceObject",
-                        fullTextEntityManager.getSearchFactory().getAnalyzer(Annotation.class)
+                        fullTextEntityManager.getSearchFactory().getAnalyzer(Annotation.class
+                        )
                 );
                 log.debug("getWikiConcept - parser=(" + parser + ")");
 
@@ -501,7 +537,8 @@ public class ClaviusGraph extends HttpServlet {
                 log.info("getWikiConcept - luceneQuery " + luceneQuery.toString("resourceObject"));
 
                 FullTextQuery fullTextQuery
-                        = fullTextEntityManager.createFullTextQuery(luceneQuery, Annotation.class);
+                        = fullTextEntityManager.createFullTextQuery(luceneQuery, Annotation.class
+                        );
 
                 result = fullTextQuery.getResultList();
                 log.debug("result " + result);
